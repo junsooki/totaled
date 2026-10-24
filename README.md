@@ -25,6 +25,14 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
 - Visa: simulated checkout, labeled as such.
 
+## Live tracker (SpacetimeDB)
+
+`spacetime/` is a SpacetimeDB module (TypeScript) published to Maincloud as `totaled-live`. The backend records each claim step through the module's `record_event` reducer (only the registered backend identity may write); `/track` on the website subscribes and updates instantly on any device. Public tables hold no personal data: claim ids, the car, dollar amounts and step names.
+
+- Publish: `cd spacetime && spacetime publish totaled-live --server maincloud`
+- Register the backend writer once: `cd backend && .venv/bin/python scripts/register_spacetime_writer.py totaled-live`, then set `SPACETIME_DB` and `SPACETIME_TOKEN` on the backend and `NEXT_PUBLIC_SPACETIME_DB` on the frontend.
+- Regenerate client bindings after changing the module: `spacetime generate --lang typescript --out-dir frontend/src/module_bindings --module-path spacetime/spacetimedb`
+
 ## Run it
 
 Backend (Python 3.9+):
