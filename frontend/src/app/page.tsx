@@ -8,7 +8,7 @@ import Payout from "@/components/Payout";
 import Rental from "@/components/Rental";
 import Replace from "@/components/Replace";
 import Upload from "@/components/Upload";
-import { Button, Stat, StepCard, Stepper, SummaryPanel, type SummaryRow } from "@/components/ui";
+import { Button, Notice, Stat, StepCard, Stepper, SummaryPanel, type SummaryRow } from "@/components/ui";
 import { call, Json, post, usd } from "@/lib/api";
 
 const STEP_LABELS = ["Upload", "Audit", "Counteroffer", "Net payout", "Rental and car", "Summary"];
@@ -100,7 +100,7 @@ export default function Home() {
   const next = () => canContinue && show(cur + 1);
 
   const trackerLink = process.env.NEXT_PUBLIC_SPACETIME_DB && id && (
-    <a className="font-medium text-brand underline underline-offset-4" href={`/track?id=${id}`} target="_blank" rel="noreferrer">
+    <a href={`/track?id=${id}`} target="_blank" rel="noreferrer">
       Open live tracker
     </a>
   );
@@ -141,25 +141,28 @@ export default function Home() {
   const personas = status?.personas ?? [];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8">
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="font-serif text-3xl font-semibold tracking-tight text-brand">Totaled</span>
-        <p className="text-base text-muted">Insurers use software to value your totaled car. Now you have software to check theirs.</p>
+    <div className="flex flex-1 flex-col">
+      <header className="border-b-4 border-brand">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-4 sm:px-6">
+          <span className="font-serif text-2xl font-semibold tracking-tight text-brand">Totaled</span>
+          <p className="text-base text-muted">Insurers use software to value your totaled car. Now you have software to check theirs.</p>
+        </div>
       </header>
 
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-6 sm:px-6 sm:pb-8">
       {!status && statusError && (
-        <p role="alert" className="mt-4 rounded-xl bg-alert-soft px-4 py-3 text-base font-medium text-alert">
-          We can&apos;t reach the server right now ({statusError}). Check that the backend is running, then reload.
-        </p>
+        <div className="mb-6">
+          <Notice tone="bad">
+            We can&apos;t reach the server right now ({statusError}). Check that the backend is running, then reload.
+          </Notice>
+        </div>
       )}
 
-      <div className="mt-8">
-        <Stepper steps={steps} current={cur} onSelect={go} />
-      </div>
+      <Stepper steps={steps} current={cur} onSelect={go} />
 
-      <main className={`mt-8 grid flex-1 items-start gap-6 ${showPanel ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : ""}`}>
+      <main className={`mt-10 grid flex-1 items-start gap-8 lg:gap-12 ${showPanel ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : ""}`}>
         {showPanel && (
-          <div className="space-y-6 lg:sticky lg:top-6 lg:order-2 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+          <div className="space-y-6 lg:sticky lg:top-6 lg:order-2 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:border-l lg:border-line lg:pl-8">
             <SummaryPanel rows={summaryRows} />
             {LIVE && id && <LiveAgentFeed claimId={id} />}
           </div>
@@ -167,7 +170,7 @@ export default function Home() {
 
         <div className={`min-w-0 ${showPanel ? "" : "mx-auto w-full max-w-3xl"}`}>
           {error && error.at === cur && (
-            <p role="alert" className="mb-4 rounded-xl bg-alert-soft px-4 py-3 text-base text-alert">{error.msg}</p>
+            <div className="mb-6"><Notice tone="bad">{error.msg}</Notice></div>
           )}
 
           {cur === 0 && (
@@ -178,7 +181,7 @@ export default function Home() {
             >
               {claim ? (
                 <div>
-                  <p className="font-serif text-2xl font-semibold text-ink">{v.year} {v.make} {v.model} {v.trim}</p>
+                  <p className="font-serif text-[1.75rem] font-semibold text-ink">{v.year} {v.make} {v.model} {v.trim}</p>
                   <p className="mt-2 text-lg text-muted">
                     Offer of {usd(claim.offer.total, true)} with {claim.comparables.length} comparable cars. Your claim is confirmed.
                   </p>
@@ -206,8 +209,8 @@ export default function Home() {
               {audit ? (
                 <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} />
               ) : auditError ? (
-                <div role="alert" className="rounded-2xl bg-alert-soft p-5">
-                  <p className="text-base text-alert">The audit did not finish. {auditError}</p>
+                <div>
+                  <Notice tone="bad" title="The audit did not finish">{auditError}</Notice>
                   <div className="mt-4">
                     <Button disabled={busy === "audit"} onClick={runAudit}>Try again</Button>
                   </div>
@@ -257,11 +260,11 @@ export default function Home() {
               subtitle="Get a ride while you wait, then find a car to replace yours. Both stay under your spending cap."
               footer={nav("Continue to summary")}
             >
-              <h2 className="font-serif text-2xl font-semibold text-ink">A rental for now</h2>
+              <h2>A rental for now</h2>
               <div className="mt-4">
                 <Rental key={`rental-${id}`} id={id} cap={cap} setCap={setCap} onHeld={() => refreshResults()} />
               </div>
-              <h2 className="mt-12 font-serif text-2xl font-semibold text-ink">Your next car</h2>
+              <h2 className="mt-12 border-t border-line pt-8">Your next car</h2>
               <div className="mt-4">
                 <Replace key={`replace-${id}`} id={id} personas={personas} cap={cap} setCap={setCap} onPurchased={() => refreshResults()} />
               </div>
@@ -277,7 +280,7 @@ export default function Home() {
             >
               {results && results.checks_failed != null ? (
                 <>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
                     <Stat label="Dollars at stake" value={usd(results.dollars_at_stake)} tone="text-brand" />
                     <Stat label="Checks failed" value={results.checks_failed} />
                     <Stat label="Upload to approved letter" value={results.minutes_to_letter != null ? `${results.minutes_to_letter} min` : "—"} />
@@ -304,14 +307,15 @@ export default function Home() {
 
       <footer className="mt-12 border-t border-line pt-4 text-sm text-muted">
         {status ? (
-          <p>
+          <p className="text-sm">
             Data: Apify {status.apify} · CRS {status.crs} · Claude {status.claude} · Database {status.database}
           </p>
         ) : (
-          <p>{statusError ? "Server status unavailable" : "Connecting…"}</p>
+          <p className="text-sm">{statusError ? "Server status unavailable" : "Connecting…"}</p>
         )}
-        <p className="mt-1">California only · not legal advice</p>
+        <p className="mt-1 text-sm">California only · not legal advice</p>
       </footer>
+      </div>
     </div>
   );
 }

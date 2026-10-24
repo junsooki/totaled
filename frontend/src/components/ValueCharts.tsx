@@ -11,7 +11,7 @@ function Tooltip({ tip }: { tip: Tip }) {
   if (!tip) return null;
   return (
     <div
-      className="pointer-events-none absolute z-10 rounded border px-2 py-1 text-xs shadow-sm"
+      className="pointer-events-none absolute z-10 border px-2 py-1 text-xs"
       style={{ left: tip.x + 12, top: tip.y + 12, background: "var(--viz-surface)", borderColor: "var(--viz-grid)", color: "var(--viz-text)" }}
     >
       {tip.lines.map((l, i) => <div key={i} className={i === 0 ? "font-medium" : ""} style={i ? { color: "var(--viz-text-2)" } : undefined}>{l}</div>)}
@@ -50,8 +50,9 @@ export function Bridge({ steps }: { steps: Json[] }) {
 
   return (
     <figure className="viz-root relative">
-      <figcaption className="mb-2 font-serif text-xl font-semibold text-ink">Where the extra {usd(steps[steps.length - 1].amount - steps[0].amount)} comes from</figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
+      <figcaption className="mb-2 border-t-2 border-rule pt-3 font-serif text-xl font-semibold text-ink">Where the extra {usd(steps[steps.length - 1].amount - steps[0].amount)} comes from</figcaption>
+      <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[540px]" role="img"
         aria-label={rows.map((r) => `${r.label} ${usd(r.amount)}`).join(", ")} onMouseLeave={() => setTip(null)}>
         {ticks(lo, hi).map((t) => (
           <g key={t}>
@@ -78,12 +79,12 @@ export function Bridge({ steps }: { steps: Json[] }) {
                 fontWeight={isTotal ? 600 : 400}>{r.label}</text>
               {isTotal ? (
                 <>
-                  <line x1={x(r.to)} x2={x(r.to)} y1={y + 6} y2={y + rowH - 6} stroke="var(--viz-total)" strokeWidth="3" strokeLinecap="round" />
+                  <line x1={x(r.to)} x2={x(r.to)} y1={y + 6} y2={y + rowH - 6} stroke="var(--viz-total)" strokeWidth="3" />
                   <text x={x(r.to) + 8} y={cy + 4} fontSize="12" fontWeight={600} fill="var(--viz-text)">{usd(r.amount)}</text>
                 </>
               ) : (
                 <>
-                  <rect x={x0} y={y + 8} width={Math.max(x1 - x0, 2)} height={rowH - 16} rx="4" fill={color} />
+                  <rect x={x0} y={y + 8} width={Math.max(x1 - x0, 2)} height={rowH - 16} fill={color} />
                   <text x={x1 + 6} y={cy + 4} fontSize="12" fill="var(--viz-text-2)">
                     {r.amount >= 0 ? "+" : "−"}{usd(Math.abs(r.amount))}
                   </text>
@@ -96,8 +97,9 @@ export function Bridge({ steps }: { steps: Json[] }) {
           );
         })}
       </svg>
+      </div>
       <Tooltip tip={tip} />
-      <p className="text-sm" style={{ color: "var(--viz-text-3)" }}>
+      <p className="mt-2 text-sm" style={{ color: "var(--viz-text-3)" }}>
         Totals are marked as levels; each bar is one correction, computed by code from the report and live listings.
       </p>
     </figure>
@@ -131,27 +133,29 @@ export function Market({ listings, fair, mileage, insurer }: { listings: Json[];
 
   return (
     <figure className="viz-root relative">
-      <figcaption className="mb-2 font-serif text-xl font-semibold text-ink">Live market: price against mileage</figcaption>
+      <figcaption className="mb-2 border-t-2 border-rule pt-3 font-serif text-xl font-semibold text-ink">Live market: price against mileage</figcaption>
       <div className="mb-2 flex flex-wrap gap-4 text-sm" style={{ color: "var(--viz-text-2)" }}>
-        <span><svg width="10" height="10" className="mr-1 inline"><circle cx="5" cy="5" r="4" fill="var(--viz-series-1)" /></svg>Listings now ({pts.length})</span>
+        <span><svg width="10" height="10" className="mr-1 inline"><rect x="1" y="1" width="8" height="8" fill="var(--viz-series-1)" /></svg>Listings now ({pts.length})</span>
         <span><svg width="10" height="10" className="mr-1 inline"><rect x="1" y="1" width="8" height="8" fill="var(--viz-series-2)" /></svg>Insurer&apos;s comparables (adjusted)</span>
         <span><svg width="14" height="10" className="mr-1 inline"><line x1="0" y1="5" x2="14" y2="5" stroke="var(--viz-text-2)" strokeWidth="2" /></svg>Market line</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" onMouseLeave={() => setTip(null)}
+      <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[540px]" role="img" onMouseLeave={() => setTip(null)}
         aria-label={`${pts.length} listings; market estimate ${usd(fair.estimate)} at ${mileage.toLocaleString()} miles`}>
         {ticks(ylo, yhi).map((t) => (
           <g key={`y${t}`}>
-            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--viz-grid)" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--viz-grid)" strokeWidth="1" />
             <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="var(--viz-text-3)">{kusd(t)}</text>
           </g>
         ))}
         {ticks(xlo, xhi).map((t) => (
           <text key={`x${t}`} x={x(t)} y={H - 14} textAnchor="middle" fontSize="11" fill="var(--viz-text-3)">{(t / 1000).toFixed(0)}k mi</text>
         ))}
+        <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--viz-text-3)" />
         {line && <line x1={x(line[0][0])} y1={y(line[0][1])} x2={x(line[1][0])} y2={y(line[1][1])} stroke="var(--viz-text-2)" strokeWidth="2" />}
         <line x1={x(mileage)} x2={x(mileage)} y1={T} y2={H - B} stroke="var(--viz-text-3)" strokeDasharray="3 3" />
         {pts.map((p, i) => (
-          <circle key={p.vin ?? i} cx={x(p.mileage)} cy={y(p.price)} r="5" fill="var(--viz-series-1)" stroke="var(--viz-surface)" strokeWidth="2"
+          <rect key={p.vin ?? i} x={x(p.mileage) - 5} y={y(p.price) - 5} width="10" height="10" fill="var(--viz-series-1)" stroke="var(--viz-surface)" strokeWidth="2"
             className={p.url ? "cursor-pointer" : ""} onClick={() => p.url && window.open(p.url, "_blank", "noreferrer")}
             onMouseMove={hover([`${p.year} ${p.make} ${p.model} ${p.trim ?? ""}`, `${usd(p.price)} · ${p.mileage.toLocaleString()} mi`,
               `${p.seller_name ?? "Seller"}${p.distance_mi != null ? ` · ${p.distance_mi} mi away` : ""}`, ...(p.url ? ["Click to open listing"] : [])])} />
@@ -164,10 +168,11 @@ export function Market({ listings, fair, mileage, insurer }: { listings: Json[];
           </g>
         ))}
         <g onMouseMove={hover(["Your car (Estimate)", `${usd(fair.estimate)} at ${mileage.toLocaleString()} mi`, fair.method])}>
-          <circle cx={x(mileage)} cy={y(fair.estimate)} r="8" fill="var(--viz-surface)" stroke="var(--viz-text)" strokeWidth="3" />
+          <rect x={x(mileage) - 8} y={y(fair.estimate) - 8} width="16" height="16" fill="var(--viz-surface)" stroke="var(--viz-text)" strokeWidth="3" />
           <text x={x(mileage) + 12} y={y(fair.estimate) - 10} fontSize="12" fontWeight={600} fill="var(--viz-text)">Your car {usd(fair.estimate)}</text>
         </g>
       </svg>
+      </div>
       <Tooltip tip={tip} />
     </figure>
   );

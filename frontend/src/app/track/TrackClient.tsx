@@ -39,11 +39,8 @@ function Tracker() {
 
   return (
     <div>
-      <p className="flex items-center gap-2 text-sm text-muted">
-        <span className="size-2 rounded-full bg-brand" aria-hidden="true" />
-        Live. Connected to SpacetimeDB.
-      </p>
-      <div className="mt-4 space-y-6">
+      <p className="text-base text-muted">Live. Connected to SpacetimeDB.</p>
+      <div className="mt-4 space-y-12">
         {shown.map((c) => {
           const at = stepIndex(c.step);
           const feed = events
@@ -51,58 +48,54 @@ function Tracker() {
             .sort((a, b) => Number(b.at.microsSinceUnixEpoch - a.at.microsSinceUnixEpoch))
             .slice(0, 8);
           return (
-            <section key={c.claimId} className="rounded-3xl bg-surface p-6 shadow-sm ring-1 ring-line sm:p-8">
+            <section key={c.claimId} className="border-t-4 border-rule pt-4">
               <h2 className="font-serif text-3xl font-semibold tracking-tight text-ink">{c.vehicle}</h2>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-base text-muted">
                 Claim {c.claimId}. Updated {c.updatedAt.toDate().toLocaleTimeString()}.
               </p>
-              <div className="mt-8 grid gap-8 md:grid-cols-[14rem_1fr]">
-                <ol aria-label="Claim progress">
+              <div className="mt-8 grid gap-10 md:grid-cols-[14rem_1fr]">
+                <ol aria-label="Claim progress" className="relative">
+                  <li aria-hidden="true" className="absolute bottom-3 left-[11px] top-3 w-0.5 bg-line" />
                   {STEPS.map(([name], i) => {
                     const done = i < at;
                     const current = i === at;
                     return (
-                      <li key={name} className="flex gap-3" aria-current={current ? "step" : undefined}>
-                        <div className="flex flex-col items-center">
-                          <span
-                            className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                              done
-                                ? "bg-brand text-white"
-                                : current
-                                  ? "bg-brand-soft text-brand ring-2 ring-brand"
-                                  : "bg-line/60 text-muted"
-                            }`}
-                          >
-                            {done ? (
-                              <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                                <path d="M4 10.5l4 4 8-9" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            ) : (
-                              i + 1
-                            )}
-                          </span>
-                          {i < STEPS.length - 1 && <span aria-hidden="true" className={`my-1 w-0.5 flex-1 ${done ? "bg-brand" : "bg-line"}`} />}
-                        </div>
-                        <div className="pb-6">
-                          <div className={`pt-1 text-base ${current ? "font-semibold text-ink" : done ? "font-medium text-ink" : "text-muted"}`}>{name}</div>
-                          <div className="text-sm text-muted">{done ? "Done" : current ? "In progress" : "Waiting"}</div>
+                      <li key={name} className="relative flex gap-4 pb-6 last:pb-0" aria-current={current ? "step" : undefined}>
+                        <span
+                          className={`relative z-10 flex size-6 shrink-0 items-center justify-center ${
+                            done
+                              ? "bg-brand text-white"
+                              : current
+                                ? "border-4 border-brand bg-surface"
+                                : "border-2 border-muted bg-surface"
+                          }`}
+                        >
+                          {done && (
+                            <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                              <path d="M4 10.5l4 4 8-9" strokeLinecap="square" />
+                            </svg>
+                          )}
+                        </span>
+                        <div>
+                          <div className={`text-lg leading-6 ${current ? "font-bold text-ink" : done ? "font-medium text-ink" : "text-muted"}`}>{name}</div>
+                          <div className="text-base text-muted">{done ? "Done" : current ? "In progress" : "Waiting"}</div>
                         </div>
                       </li>
                     );
                   })}
                 </ol>
                 <div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
                     <Stat label="Insurer offer" value={usd(c.offerTotal)} />
                     <Stat label="Counteroffer" value={c.counterofferTotal ? usd(c.counterofferTotal) : "—"} />
                     <Stat label="Checks failed" value={at >= 1 ? c.checksFailed : "—"} />
                     <Stat label="Walk away with" value={at >= 3 ? usd(c.walkAway) : "—"} tone="text-brand" />
                   </div>
-                  <div className="mt-6"><AgentFeed claimId={c.claimId} /></div>
+                  <div className="mt-8"><AgentFeed claimId={c.claimId} /></div>
                   {feed.length > 0 && (
-                    <ul className="mt-6 space-y-1.5 text-sm text-muted">
+                    <ul className="mt-8 border-t border-line text-base text-muted">
                       {feed.map((e) => (
-                        <li key={e.id.toString()}>
+                        <li key={e.id.toString()} className="border-t border-line py-2 first:border-t-0">
                           {e.at.toDate().toLocaleTimeString()}. <span className="font-medium text-ink">{e.kind}</span> {e.detail}
                         </li>
                       ))}
