@@ -8,13 +8,47 @@
   --brand: #1f4d3a;
   --brand-dark: #173b2c;
   --brand-soft: #e4eee6;
-  --line: #e3dccb;
+  --line: #d3cab4;
+  --rule: #1f2a24;
+  --disabled: #d9e0d9;
+  --disabled-text: #4d5951;
   --alert: #b5472f;
   --alert-soft: #f6e3dd;
   --amber: #9a6a12;
   --amber-soft: #f5e8cb;
   --background: var(--cream);
   --foreground: var(--ink);
+}
+
+/* Flat system: every radius and shadow resolves to nothing. rounded-full stays (it is a literal 9999px). */
+@theme {
+  --radius: 0px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+  --inset-shadow-2xs: none;
+  --inset-shadow-xs: none;
+  --inset-shadow-sm: none;
+  --drop-shadow-xs: none;
+  --drop-shadow-sm: none;
+  --drop-shadow: none;
+  --drop-shadow-md: none;
+  --drop-shadow-lg: none;
+  --drop-shadow-xl: none;
+  --drop-shadow-2xl: none;
 }
 
 @theme inline {
@@ -32,6 +66,9 @@
   --color-alert-soft: var(--alert-soft);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
+  --color-rule: var(--rule);
+  --color-disabled: var(--disabled);
+  --color-disabled-text: var(--disabled-text);
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
 }
@@ -40,6 +77,51 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+/* Type scale. In the base layer so utility classes still win. */
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  h1 {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  h2 {
+    font-size: 1.75rem;
+    line-height: 1.25;
+  }
+  h3 {
+    font-size: 1.25rem;
+    line-height: 1.35;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  p {
+    font-size: 1.125rem;
+    line-height: 1.6;
+  }
+  a {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  a:hover {
+    text-decoration-thickness: 3px;
+  }
+  @media (min-width: 64rem) {
+    h1 {
+      font-size: 2.5rem;
+    }
+  }
 }
 
 /* Chart role tokens, tuned to the cream/green palette */

@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 import { API, Json, usd } from "@/lib/api";
-import { Badge, Stat } from "./ui";
+import { Badge, Notice, Stat, SummaryList } from "./ui";
 import { Bridge, Market } from "./ValueCharts";
 
-const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+const focusRing = "focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 const TABS = [
   { id: "failed", label: "What failed" },
@@ -33,7 +33,7 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
 
   return (
     <div>
-      <div role="tablist" aria-label="Audit results" onKeyDown={onKey} className="flex gap-1 overflow-x-auto border-b border-line">
+      <div role="tablist" aria-label="Audit results" onKeyDown={onKey} className="flex gap-6 overflow-x-auto overflow-y-hidden border-b border-line">
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -44,8 +44,8 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
             aria-controls={`audit-panel-${t.id}`}
             tabIndex={active === i ? 0 : -1}
             onClick={() => setActive(i)}
-            className={`-mb-px shrink-0 cursor-pointer rounded-t-lg border-b-2 px-4 py-3 text-base font-semibold transition-colors ${focusRing} ${
-              active === i ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"
+            className={`-mb-px shrink-0 cursor-pointer border-b-4 py-3 text-lg ${focusRing} ${
+              active === i ? "border-brand font-bold text-ink" : "border-transparent text-brand underline underline-offset-4 hover:text-brand-dark"
             }`}
           >
             {t.label}
@@ -60,7 +60,7 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
           aria-labelledby={`audit-tab-${t.id}`}
           hidden={active !== i}
           tabIndex={0}
-          className={`pt-6 ${focusRing} rounded-lg`}
+          className={`pt-6 ${focusRing}`}
         >
           {active === i && panels[t.id]}
         </div>
@@ -82,7 +82,7 @@ function ReportLine({ src, alt }: { src: string; alt: string }) {
           <button
             type="button"
             onClick={() => { setState("loading"); setAttempt((a) => a + 1); }}
-            className={`cursor-pointer rounded font-semibold text-brand underline ${focusRing}`}
+            className={`cursor-pointer font-semibold text-brand underline ${focusRing}`}
           >
             Try again
           </button>
@@ -95,7 +95,7 @@ function ReportLine({ src, alt }: { src: string; alt: string }) {
           alt={alt}
           onLoad={() => setState("ok")}
           onError={() => setState("error")}
-          className={`w-full rounded-lg ring-1 ring-line ${state === "ok" ? "" : "hidden"}`}
+          className={`w-full ${state === "ok" ? "" : "hidden"}`}
         />
       )}
     </div>
@@ -143,26 +143,26 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
     const quiet = status === "pass";
     const firstBad = rs.find((r) => r.status !== "pass");
     return (
-      <li key={ch.check} className={quiet ? "border-t border-line first:border-t-0" : "rounded-2xl bg-alert-soft/50"}>
+      <li key={ch.check} className={`border-t border-t-line first:border-t-0 ${quiet ? "" : status === "fail" ? "border-l-[5px] border-l-alert" : "border-l-[5px] border-l-amber"}`}>
         <button
           type="button"
           aria-expanded={isOpen}
           onClick={() => toggle(ch.check)}
-          className={`flex w-full cursor-pointer items-start justify-between gap-4 rounded-2xl px-4 py-4 text-left ${focusRing}`}
+          className={`flex w-full cursor-pointer items-start justify-between gap-4 py-4 text-left ${quiet ? "" : "pl-4"} ${focusRing}`}
         >
           <span>
-            <span className={`block font-semibold ${quiet ? "text-ink" : "text-alert"}`}>
+            <span className="block text-lg font-semibold text-ink">
               {ch.check}. {ch.name} <span className="sr-only">: {label(status)}</span>
             </span>
-            <span className="mt-1 block text-base text-muted">{quiet ? ch.rule : (firstBad?.detail ?? ch.rule)}</span>
+            <span className="mt-1 block max-w-prose text-base text-muted">{quiet ? ch.rule : (firstBad?.detail ?? ch.rule)}</span>
           </span>
           <span className="flex shrink-0 items-center gap-2">
-            {!quiet && <span className={`text-sm font-semibold ${toneCls(status)}`}>{label(status)}</span>}
-            <span aria-hidden="true" className="text-muted">{isOpen ? "Hide" : "Details"}</span>
+            {!quiet && <span className={`text-base font-semibold ${toneCls(status)}`}>{label(status)}</span>}
+            <span aria-hidden="true" className="text-brand underline underline-offset-4">{isOpen ? "Hide" : "Details"}</span>
           </span>
         </button>
         {isOpen && (
-          <div className="space-y-5 px-4 pb-5">
+          <div className={`space-y-5 pb-5 ${quiet ? "" : "pl-4"}`}>
             {ch.rule && <p className="text-base text-muted">Rule: {ch.rule}</p>}
             {rs.map((r, i) => {
               const key = `${r.check}:${r.comparable ?? ""}:${i}`;
@@ -180,7 +180,7 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
                         <button
                           type="button"
                           onClick={() => setShown(shown === key ? null : key)}
-                          className={`mt-2 cursor-pointer rounded text-base font-semibold text-brand underline ${focusRing}`}
+                          className={`mt-2 cursor-pointer text-base font-semibold text-brand underline ${focusRing}`}
                         >
                           {shown === key ? "Hide report line" : "Show the line in your report"}
                         </button>
@@ -206,10 +206,10 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
     <div className="space-y-8">
       {failed.length > 0 ? (
         <div>
-          <h3 className="font-serif text-xl font-semibold text-ink">
+          <h3 className="font-serif text-2xl font-semibold text-ink">
             {headline}
           </h3>
-          <ul className="mt-3 space-y-3">{failed.map(row)}</ul>
+          <ul className="mt-3 border-b border-line">{failed.map(row)}</ul>
         </div>
       ) : rows.length > 0 ? (
         <p className="text-base text-ink">Every check passed. The report looks sound.</p>
@@ -218,7 +218,7 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
       )}
       {passed.length > 0 && (
         <div>
-          <h3 className="text-base font-semibold text-muted">{passed.length} passed</h3>
+          <h3 className="border-t-2 border-rule pt-3 text-xl">{passed.length} passed</h3>
           <ul className="mt-2">{passed.map(row)}</ul>
         </div>
       )}
@@ -228,27 +228,26 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
 
   const marketPanel = (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-        <div>
-          <div className="text-base text-muted">Fair value of your car (estimate)</div>
-          <div className="font-serif text-4xl font-semibold tracking-tight text-ink">{fv ? usd(fv.estimate) : "—"}</div>
-        </div>
-        <Badge tone={audit.market.source === "demo" ? "amber" : "green"}>
-          {audit.market.source === "demo" ? "demo" : audit.market.source}
-        </Badge>
-      </div>
+      <Stat label="Fair value of your car (estimate)" value={fv ? usd(fv.estimate) : "—"} />
+      <SummaryList
+        rows={[
+          { label: "Source", value: <Badge tone={audit.market.source === "demo" ? "amber" : "green"}>{audit.market.source === "demo" ? "demo" : audit.market.source}</Badge> },
+          { label: "Listings used", value: fv ? `${fv.n_comps} of ${audit.market.searched} found` : "None" },
+          ...(fv ? [{ label: "Method", value: fv.method }] : []),
+        ]}
+      />
       <p className="max-w-prose text-base text-muted">
-        {fv ? `Estimate: ${fv.method} over ${fv.n_comps} same-year, same-trim listings out of ${audit.market.searched} found. ` : "No matching listings found. "}
+        {fv ? "The estimate uses same-year, same-trim listings. " : "No matching listings found. "}
         {audit.market.fetched_at && `CarGurus via Apify, fetched ${new Date(audit.market.fetched_at).toLocaleString()}.`}
       </p>
       <Market listings={audit.market.listings} fair={fv} mileage={claim.vehicle.mileage} insurer={audit.insurer_comps ?? []} />
       {audit.market.listings.length > 0 && (
         <div>
-          <h4 className="font-semibold text-ink">Live listings behind the estimate</h4>
-          <ul className="mt-2 space-y-1 text-base text-muted">
+          <h4 className="border-t-2 border-rule pt-3 text-xl">Live listings behind the estimate</h4>
+          <ul className="mt-2 text-base text-muted">
             {audit.market.listings.slice(0, 5).map((l: Json) => (
-              <li key={l.vin}>
-                {l.url ? <a className="text-brand underline" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
+              <li key={l.vin} className="border-t border-line py-2 first:border-t-0">
+                {l.url ? <a className="text-brand underline underline-offset-2" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
                   : `${l.year} ${l.make} ${l.model} ${l.trim}`}
                 {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
               </li>
@@ -277,27 +276,27 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
 
   return (
     <div className="space-y-10">
-      <div className="text-center">
+      <div className="border-t-4 border-rule pt-4">
         <p className="text-lg text-muted">Your insurer may owe you about</p>
-        <p className="mt-1 font-serif text-6xl font-semibold tracking-tight text-brand sm:text-7xl">{co ? usd(co.gap) : "—"}</p>
-        <p className="mx-auto mt-3 max-w-prose text-lg text-ink">
+        <p className="mt-1 font-serif text-7xl font-semibold leading-none tracking-tight text-brand sm:text-8xl">{co ? usd(co.gap) : "—"}</p>
+        <p className="mt-4 max-w-prose text-lg text-ink">
           {co
             ? `That is the gap between their offer of ${usd(claim.offer.total)} and a fair total of ${usd(co.total)}.`
             : "We could not work out a fair total without matching listings."}
         </p>
       </div>
 
-      <div className={`rounded-2xl p-5 ${urgent ? "bg-alert-soft" : "bg-amber-soft"}`}>
-        <p className="text-lg text-ink">
+      <Notice tone={urgent ? "bad" : "warn"} announce={false}>
+        <p className="text-lg">
           <span className="font-serif text-2xl font-semibold">{d.days_left} days left</span> to dispute. Your deadline is {d.date}.
         </p>
-        <p className="mt-2 text-base text-ink">
+        <p className="mt-2">
           Tell your insurer you can&apos;t buy a comparable car for the settlement within 35 days of the offer (10 CCR § 2695.8(c)).
           {d.insurer_exception_may_apply &&
             " The report names a comparable with seller contact and an identifier, so the insurer may not have to reopen. Check that car is really available."}{" "}
           Not legal advice.
         </p>
-      </div>
+      </Notice>
 
       <Tabs panels={{ failed: failedPanel, market: marketPanel, gap: gapPanel }} />
     </div>

@@ -1,59 +1,90 @@
 import type { ReactNode } from "react";
 
 const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-cream";
+  "focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 export function Button({
   children,
   onClick,
   disabled,
   variant = "primary",
+  type = "button",
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   variant?: "primary" | "secondary";
+  type?: "button" | "submit" | "reset";
 }) {
   const styles =
     variant === "primary"
-      ? "bg-brand text-white hover:bg-brand-dark shadow-sm"
-      : "bg-surface text-brand ring-1 ring-inset ring-brand/40 hover:bg-brand-soft";
+      ? "border-b-[3px] border-brand-dark bg-brand text-white hover:bg-brand-dark active:translate-y-0.5 active:border-b-[1px] disabled:border-b-0 disabled:bg-disabled disabled:text-disabled-text disabled:active:translate-y-0"
+      : "border-2 border-ink bg-surface text-ink hover:bg-brand-soft active:translate-y-0.5 disabled:border-disabled-text/40 disabled:bg-disabled disabled:text-disabled-text disabled:active:translate-y-0";
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${styles}`}
+      className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 px-5 py-2 text-lg font-semibold disabled:cursor-not-allowed ${focusRing} ${styles}`}
     >
       {children}
     </button>
   );
 }
 
+/** Typographic figure: muted label, big serif number, 4px ink rule above. No box. */
 export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: string }) {
   return (
-    <div className="rounded-2xl bg-surface p-5 shadow-sm">
-      <div className="text-sm text-muted">{label}</div>
-      <div className={`mt-1 font-serif text-3xl font-semibold tracking-tight ${tone ?? "text-ink"}`}>{value}</div>
+    <div className="border-t-4 border-rule pt-3">
+      <div className="text-base text-muted">{label}</div>
+      <div className={`mt-1 font-serif text-4xl font-semibold tracking-tight ${tone ?? "text-ink"}`}>{value}</div>
     </div>
   );
 }
 
+/** Square status tag. Use only for meaningful status. */
 export function Badge({ children, tone = "zinc" }: { children: ReactNode; tone?: "zinc" | "red" | "green" | "amber" }) {
   const t = {
-    zinc: "bg-line/60 text-ink",
-    red: "bg-alert-soft text-alert",
-    green: "bg-brand-soft text-brand",
-    amber: "bg-amber-soft text-amber",
+    zinc: "border-ink text-ink",
+    red: "border-alert text-alert",
+    green: "border-brand text-brand",
+    amber: "border-amber text-amber",
   }[tone];
-  return <span className={`inline-block rounded-full px-2.5 py-0.5 text-sm font-medium ${t}`}>{children}</span>;
+  return <span className={`inline-block border px-2 py-0.5 text-sm font-bold ${t}`}>{children}</span>;
+}
+
+/** Flat callout (GOV.UK inset text): 5px left border in the tone color and a light tint. Use sparingly. */
+export function Notice({
+  tone = "info",
+  title,
+  announce = tone === "bad",
+  children,
+}: {
+  tone?: "info" | "good" | "warn" | "bad";
+  title?: string;
+  announce?: boolean;
+  children?: ReactNode;
+}) {
+  const t = {
+    info: "border-ink bg-line/40",
+    good: "border-brand bg-brand-soft",
+    warn: "border-amber bg-amber-soft",
+    bad: "border-alert bg-alert-soft",
+  }[tone];
+  return (
+    <div role={announce ? "alert" : undefined} className={`border-l-[5px] px-4 py-3 text-ink ${t}`}>
+      {title && <h3 className="mb-1">{title}</h3>}
+      {children !== undefined && children !== null && <div className="text-base [&>p]:text-base">{children}</div>}
+    </div>
+  );
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+  "block min-h-11 w-full border-2 border-ink bg-surface px-3 py-2 text-lg text-ink placeholder:text-muted focus-visible:outline-4 focus-visible:outline-offset-0 focus-visible:outline-brand";
 
 export type StepperStep = { label: string; done?: boolean; locked?: boolean };
 
-/** Progress bar. `current` is a 0-based index. Done and unlocked steps are clickable; locked ones are not. */
+/** Numbered progress list. `current` is a 0-based index. Done and unlocked steps are clickable; locked ones are not. */
 export function Stepper({
   steps,
   current,
@@ -68,56 +99,53 @@ export function Stepper({
       {/* Narrow screens: compact bar */}
       <div className="sm:hidden">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-ink">
+          <span className="text-base font-bold text-ink">
             Step {current + 1} of {steps.length}
           </span>
-          <span className="text-sm text-muted">{steps[current]?.label}</span>
+          <span className="text-base text-muted">{steps[current]?.label}</span>
         </div>
-        <div className="mt-2 flex gap-1.5" aria-hidden="true">
+        <div className="mt-2 flex gap-1" aria-hidden="true">
           {steps.map((s, i) => (
-            <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= current || s.done ? "bg-brand" : "bg-line"}`} />
+            <span key={i} className={`h-1.5 flex-1 ${i <= current || s.done ? "bg-brand" : "bg-line"}`} />
           ))}
         </div>
       </div>
       {/* Wider screens: numbered steps */}
-      <ol className="hidden items-start sm:flex">
+      <ol className="hidden sm:flex">
         {steps.map((s, i) => {
           const isCurrent = i === current;
           const disabled = !!s.locked && !isCurrent;
-          const circle = isCurrent
-            ? "bg-brand text-white ring-4 ring-brand-soft"
+          const box = isCurrent
+            ? "bg-brand text-white"
             : s.done
-              ? "bg-brand-soft text-brand"
+              ? "border border-brand text-brand"
               : disabled
-                ? "bg-line/60 text-muted"
-                : "bg-surface text-brand ring-1 ring-inset ring-brand/40";
+                ? "border border-line text-muted"
+                : "border border-ink text-ink";
           return (
-            <li key={i} className="flex flex-1 items-start last:flex-none">
+            <li key={i} className={`flex-1 border-t-4 ${isCurrent ? "border-brand" : "border-line"} ${i > 0 ? "border-l-0" : ""}`}>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onSelect(i)}
                 aria-current={isCurrent ? "step" : undefined}
-                className={`group flex w-24 shrink-0 cursor-pointer flex-col items-center gap-2 rounded-lg py-1 text-center disabled:cursor-not-allowed ${focusRing}`}
+                className={`flex w-full cursor-pointer flex-col items-start gap-2 px-3 py-3 text-left disabled:cursor-not-allowed ${focusRing}`}
               >
-                <span className={`flex size-9 items-center justify-center rounded-full text-sm font-semibold ${circle}`}>
+                <span className={`flex size-7 items-center justify-center text-sm font-bold ${box}`}>
                   {s.done && !isCurrent ? (
-                    <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                      <path d="M4 10.5l4 4 8-9" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                      <path d="M4 10.5l4 4 8-9" strokeLinecap="square" />
                     </svg>
                   ) : (
                     i + 1
                   )}
                 </span>
                 <span
-                  className={`text-sm leading-tight ${isCurrent ? "font-semibold text-ink" : disabled ? "text-muted" : "font-medium text-ink"}`}
+                  className={`text-base leading-tight ${isCurrent ? "font-bold text-ink" : disabled ? "text-muted" : "text-brand underline underline-offset-4"}`}
                 >
                   {s.label}
                 </span>
               </button>
-              {i < steps.length - 1 && (
-                <span aria-hidden="true" className={`mt-[18px] h-0.5 flex-1 ${s.done ? "bg-brand" : "bg-line"}`} />
-              )}
             </li>
           );
         })}
@@ -126,7 +154,7 @@ export function Stepper({
   );
 }
 
-/** White-ish card for one wizard screen. `footer` holds Back / Continue. */
+/** One wizard screen, no card. The title is the page h1. `footer` holds Back / Continue under a hairline rule. */
 export function StepCard({
   title,
   subtitle,
@@ -139,9 +167,9 @@ export function StepCard({
   footer?: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl bg-surface p-6 shadow-sm ring-1 ring-line sm:p-10">
-      <h1 tabIndex={-1} className="font-serif text-3xl font-semibold tracking-tight text-ink outline-none sm:text-4xl">{title}</h1>
-      {subtitle && <p className="mt-2 max-w-prose text-lg text-muted">{subtitle}</p>}
+    <section>
+      <h1 tabIndex={-1} className="outline-none">{title}</h1>
+      {subtitle && <p className="mt-3 max-w-prose text-[1.1875rem] text-muted">{subtitle}</p>}
       {children && <div className="mt-8">{children}</div>}
       {footer && (
         <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
@@ -154,27 +182,36 @@ export function StepCard({
 
 export type SummaryRow = { label: string; value: ReactNode; tone?: "good" | "bad" | "warn"; big?: boolean };
 
-/**
- * Order-summary style panel. Put it first in the DOM; at lg and up it is sticky
- * (give the parent grid `lg:order-2` on its wrapper). Below lg it is a compact two-column block.
- */
-export function SummaryPanel({ title = "Your case", rows, children }: { title?: string; rows: SummaryRow[]; children?: ReactNode }) {
+/** GOV.UK summary list: label left, value right (stacked when the list is narrow), hairline rules, no boxes. */
+export function SummaryList({ rows }: { rows: SummaryRow[] }) {
   const toneCls = { good: "text-brand", bad: "text-alert", warn: "text-amber" };
   return (
-    <aside aria-label={title} className="rounded-3xl bg-brand-soft p-5 lg:sticky lg:top-6 lg:p-6">
-      <h2 className="font-serif text-xl font-semibold text-ink">{title}</h2>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-1 lg:gap-y-4">
-        {rows.map((r, i) => (
-          <div key={i} className={r.big ? "col-span-2 lg:col-span-1" : ""}>
-            <dt className="text-sm text-muted">{r.label}</dt>
-            <dd
-              className={`${r.big ? "font-serif text-3xl font-semibold tracking-tight" : "text-base font-medium"} ${r.tone ? toneCls[r.tone] : "text-ink"}`}
-            >
-              {r.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
+    <dl className="@container">
+      {rows.map((r, i) => (
+        <div key={i} className="flex flex-col gap-0.5 border-t border-line py-3 first:border-t-0 @sm:flex-row @sm:gap-6">
+          <dt className="text-base text-muted @sm:w-2/5 @sm:shrink-0">{r.label}</dt>
+          <dd
+            className={`m-0 min-w-0 ${r.big ? "font-serif text-4xl font-semibold leading-tight tracking-tight" : "text-lg font-medium"} ${r.tone ? toneCls[r.tone] : "text-ink"}`}
+          >
+            {r.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * Case summary column: 4px brand rule on top, serif title, summary list. Put it first in the DOM; at lg and up
+ * it is sticky (give its wrapper `lg:order-2`).
+ */
+export function SummaryPanel({ title = "Your case", rows, children }: { title?: string; rows: SummaryRow[]; children?: ReactNode }) {
+  return (
+    <aside aria-label={title} className="border-t-4 border-brand pt-3 lg:sticky lg:top-6">
+      <h2 className="text-2xl">{title}</h2>
+      <div className="mt-2">
+        <SummaryList rows={rows} />
+      </div>
       {children}
     </aside>
   );

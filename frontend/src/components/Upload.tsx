@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { API, Json, put } from "@/lib/api";
-import { Badge, Button, inputCls } from "./ui";
+import { Badge, Button, Notice, inputCls } from "./ui";
 
 const fileBtn =
-  "inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold transition-colors focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-cream";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 px-5 py-2 text-lg font-semibold focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand";
+const filePrimary = `${fileBtn} border-b-[3px] border-brand-dark bg-brand text-white hover:bg-brand-dark`;
+const fileSecondary = `${fileBtn} border-2 border-ink bg-surface text-ink hover:bg-brand-soft`;
+const linkCls =
+  "cursor-pointer text-brand underline underline-offset-4 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline";
+const sectionH = "font-serif text-2xl font-semibold text-ink";
 
 type Path = (string | number)[];
 
@@ -142,7 +147,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
     );
   };
   const labeled = (label: string, path: Path, key: string) => (
-    <label key={path.join(".")} className="block text-sm font-medium text-ink">
+    <label key={path.join(".")} className="block text-base font-medium text-ink">
       <span className="mb-1 block">{label}</span>
       {field(path, key)}
     </label>
@@ -152,20 +157,15 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   if (stage === "add" || !draft) {
     if (busy) {
       return (
-        <div role="status" aria-live="polite" className="rounded-3xl bg-brand-soft px-6 py-14 text-center">
-          <div className="mx-auto size-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden="true" />
-          <p className="mt-6 font-serif text-2xl font-semibold text-ink">Reading your report…</p>
-          <p className="mx-auto mt-2 max-w-md text-base text-muted">
-            This can take a minute. We are pulling out your car, the offer and the comparable cars. You can check it all next.
-          </p>
-          <div className="mx-auto mt-6 h-1.5 max-w-xs overflow-hidden rounded-full bg-brand/15" aria-hidden="true">
-            <div className="h-full w-1/2 animate-pulse rounded-full bg-brand" />
-          </div>
+        <div role="status" aria-live="polite">
+          <Notice tone="info" title="Reading your report">
+            <p>This can take a minute. We are pulling out your car, the offer and the comparable cars. You can check it all next.</p>
+          </Notice>
         </div>
       );
     }
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
@@ -174,17 +174,14 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
             setDragging(false);
             if (e.dataTransfer.files.length) start(e.dataTransfer.files);
           }}
-          className={`rounded-3xl border-2 border-dashed px-6 py-14 text-center transition-colors ${dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-cream"}`}
+          className={`border-2 border-dashed px-6 py-12 ${dragging ? "border-brand" : "border-ink"}`}
         >
-          <svg viewBox="0 0 24 24" className="mx-auto size-12 text-brand" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="mt-4 font-serif text-2xl font-semibold text-ink">Drop your valuation report here</p>
-          <p className="mx-auto mt-2 max-w-md text-base text-muted">
-            One PDF works best. A photo of each page works too.
+          <h2 className={sectionH}>Add your valuation report</h2>
+          <p className="mt-2 max-w-prose text-lg text-muted">
+            Drop it here. One PDF works best. A photo of each page works too.
           </p>
           <div className="mt-6">
-            <label className={`${fileBtn} bg-brand text-white shadow-sm hover:bg-brand-dark`}>
+            <label className={filePrimary}>
               Choose a PDF or photos
               <input type="file" accept="application/pdf,image/*" multiple className="sr-only"
                 onChange={(e) => {
@@ -195,7 +192,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
           </div>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className={`${fileBtn} bg-surface text-brand ring-1 ring-inset ring-brand/40 hover:bg-brand-soft`}>
+          <label className={fileSecondary}>
             Take photos with your camera
             <input type="file" accept="image/*" capture="environment" multiple className="sr-only"
               onChange={(e) => {
@@ -219,23 +216,23 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   const c = draft.claim;
   return (
     <div className="space-y-10">
-      <p className="text-base text-muted">
+      <p className="text-lg text-muted">
         We read your report using <Badge>{draft.by}</Badge>. Fix anything that looks wrong, then confirm.
       </p>
 
-      <section>
-        <h2 className="font-serif text-2xl font-semibold text-ink">Your car</h2>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <section className="border-t border-line pt-6">
+        <h2 className={sectionH}>Your car</h2>
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
           {VEHICLE.map(([k, label]) => (
-            <div key={k} className={k === "vin" ? "col-span-2" : ""}>
+            <div key={k} className={k === "vin" ? "sm:col-span-2" : ""}>
               {labeled(label, ["vehicle", k], k)}
               {k === "vin" && (
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                  <button type="button" className="cursor-pointer font-semibold text-brand underline underline-offset-2 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-base">
+                  <button type="button" className={linkCls}
                     disabled={vinBusy || (c.vehicle.vin ?? "").length !== 17} onClick={() => decodeVin(c.vehicle.vin)}>
                     {vinBusy ? "Checking…" : "Look up this VIN"}
                   </button>
-                  <label className="cursor-pointer font-semibold text-brand underline underline-offset-2 hover:text-brand-dark focus-within:ring-2 focus-within:ring-brand">
+                  <label className={`${linkCls} focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand`}>
                     Scan it from a photo
                     <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={vinBusy}
                       onChange={(e) => {
@@ -248,40 +245,44 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
               )}
             </div>
           ))}
-          <div className="col-span-2 sm:col-span-1">{labeled("Your ZIP", ["owner_zip"], "owner_zip")}</div>
+          <div>{labeled("Your ZIP", ["owner_zip"], "owner_zip")}</div>
         </div>
-        <div className="mt-2 space-y-1 text-sm" aria-live="polite">
-          <p className="text-muted">{vinNote ?? "The VIN is on the door-jamb sticker, the dashboard plate or your registration card."}</p>
-          {vinIssues.map((m, i) => <p key={i} className="font-medium text-alert">Please check: {m}</p>)}
+        <div className="mt-3 space-y-3" aria-live="polite">
+          <p className="text-base text-muted">{vinNote ?? "The VIN is on the door-jamb sticker, the dashboard plate or your registration card."}</p>
+          {vinIssues.length > 0 && (
+            <Notice tone="warn">
+              {vinIssues.map((m, i) => <p key={i}>Please check: {m}</p>)}
+            </Notice>
+          )}
         </div>
       </section>
 
-      <section>
-        <h2 className="font-serif text-2xl font-semibold text-ink">The insurer&apos;s offer</h2>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <section className="border-t border-line pt-6">
+        <h2 className={sectionH}>The insurer&apos;s offer</h2>
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           {OFFER.map(([k, label]) => labeled(label, ["offer", k], k))}
           {labeled("Condition deduction", ["condition", "deduction"], "deduction")}
           {labeled("Condition grade", ["condition", "subject_grade"], "subject_grade")}
         </div>
       </section>
 
-      <section>
-        <h2 className="font-serif text-2xl font-semibold text-ink">Cars the insurer compared</h2>
-        <div className="mt-4 divide-y divide-line">
+      <section className="border-t border-line pt-6">
+        <h2 className={sectionH}>Cars the insurer compared</h2>
+        <ol className="mt-4 divide-y divide-line">
           {c.comparables.map((comp: Json, i: number) => (
-            <div key={comp.id ?? i} className="py-6 first:pt-0 last:pb-0">
-              <h3 className="text-lg font-semibold text-ink">Comparable {comp.id}</h3>
-              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            <li key={comp.id ?? i} className="py-6 first:pt-0 last:pb-0">
+              <h3 className="font-serif text-xl font-semibold text-ink">{i + 1}. Comparable {comp.id}</h3>
+              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
                 {COMP.map(([k, label]) => labeled(label, ["comparables", i, k], k))}
               </div>
               {comp.adjustments?.length > 0 && (
-                <p className="mt-3 text-sm text-muted">
+                <p className="mt-3 text-base text-muted">
                   Adjustments: {comp.adjustments.map((a: Json) => `${a.label} ${a.amount >= 0 ? "+" : ""}${a.amount}`).join(", ")}
                 </p>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}
