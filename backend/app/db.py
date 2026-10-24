@@ -16,7 +16,7 @@ SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", Path(__file__).resolve().parent
 def _connect():
     if DATABASE_URL:
         import psycopg
-        return psycopg.connect(DATABASE_URL, autocommit=True), "%s"
+        return psycopg.connect(DATABASE_URL, autocommit=True, prepare_threshold=None), "%s"  # pooler-safe
     SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(SQLITE_PATH, isolation_level=None), "?"
 
@@ -26,6 +26,9 @@ def _init():
     conn.execute("CREATE TABLE IF NOT EXISTS claims (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS events (claim_id TEXT NOT NULL, at TEXT NOT NULL, kind TEXT NOT NULL, "
                  "detail TEXT NOT NULL)")
+    if DATABASE_URL:  # Supabase exposes public tables over its REST API; RLS with no policies blocks that
+        conn.execute("ALTER TABLE claims ENABLE ROW LEVEL SECURITY")
+        conn.execute("ALTER TABLE events ENABLE ROW LEVEL SECURITY")
     conn.close()
 
 
