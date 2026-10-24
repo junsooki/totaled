@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Json, post, usd } from "@/lib/api";
 import { Badge, Button, inputCls } from "./ui";
 
+/** Monthly payment on an amortized loan. */
+const monthly = (p: number, apr: number, n: number) => (p * (apr / 12)) / (1 - (1 + apr / 12) ** -n);
+
 export default function Payout({ id, personas, onDone }: { id: string; personas: Json[]; onDone: (p: Json) => void }) {
   const [persona, setPersona] = useState("P01");
   const [balance, setBalance] = useState("");
@@ -31,6 +34,7 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
   }
 
   const np = result ? result.at_counteroffer ?? result.at_offer : null;
+  const cols: Json[] = result ? [result.at_offer, ...(result.at_counteroffer ? [result.at_counteroffer] : [])] : [];
   const walkTone = (x: Json) => (x.negative_equity ? "text-alert" : "text-brand");
   const labelCls = "block text-base font-medium text-ink";
 
@@ -67,24 +71,38 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
 
       {result && np && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl bg-surface p-6 shadow-sm ring-1 ring-line">
-              <p className="text-base text-muted">At the insurer&apos;s offer, you walk away with</p>
-              <p className={`mt-2 font-serif text-5xl font-semibold tracking-tight ${walkTone(result.at_offer)}`}>
-                {usd(result.at_offer.walk_away)}
-              </p>
-              <p className="mt-2 text-base text-muted">Payout {usd(result.at_offer.payout)}</p>
-            </div>
-            {result.at_counteroffer && (
-              <div className="rounded-2xl bg-brand-soft p-6">
-                <p className="text-base text-muted">At your counteroffer, you walk away with</p>
-                <p className={`mt-2 font-serif text-5xl font-semibold tracking-tight ${walkTone(result.at_counteroffer)}`}>
-                  {usd(result.at_counteroffer.walk_away)}
-                </p>
-                <p className="mt-2 text-base text-muted">Payout {usd(result.at_counteroffer.payout)}</p>
-              </div>
-            )}
+          <div className="overflow-x-auto rounded-2xl ring-1 ring-line">
+            <table className="w-full text-left text-base">
+              <caption className="sr-only">Payout at the insurer&apos;s offer and at your counteroffer</caption>
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className="p-4 font-medium text-muted"><span className="sr-only">Line</span></th>
+                  <th scope="col" className="p-4 font-semibold text-ink">At their offer</th>
+                  {cols.length > 1 && <th scope="col" className="bg-brand-soft p-4 font-semibold text-ink">At your counteroffer</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {([
+                  ["Insurance payout", (x: Json) => usd(x.payout)],
+                  ["You still owe on the loan", (x: Json) => (x.loan_balance ? `− ${usd(x.loan_balance)}` : usd(0))],
+                  ["You walk away with", (x: Json) => <span className={`font-serif text-3xl font-semibold tracking-tight ${walkTone(x)}`}>{usd(x.walk_away)}</span>],
+                  ["Negative equity", (x: Json) => (x.negative_equity ? (x.gap_covers_shortfall ? "Yes, GAP should cover it" : "Yes, you pay the difference") : "No")],
+                  ["Buying power for your next car", (x: Json) => usd(Math.max(x.walk_away, 0) + x.prequal.max_amount)],
+                  ["Financing", (x: Json) => (x.prequal.decision === "PREQUALIFIED" ? "Qualifies" : x.prequal.decision === "DECLINE" ? "Does not qualify" : "Needs review")],
+                ] as [string, (x: Json) => React.ReactNode][]).map(([label, f]) => (
+                  <tr key={label}>
+                    <th scope="row" className="p-4 font-medium text-muted">{label}</th>
+                    {cols.map((x, i) => <td key={i} className={`p-4 text-ink ${i === 1 ? "bg-brand-soft" : ""}`}>{f(x)}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          {result.at_counteroffer && (
+            <p className="max-w-prose text-lg text-ink">
+              Winning the counteroffer puts <span className="font-semibold text-brand">{usd(result.at_counteroffer.walk_away - result.at_offer.walk_away)}</span> more in your pocket.
+            </p>
+          )}
 
           <p className="max-w-prose text-lg text-ink">
             {np.loan_balance
@@ -105,15 +123,17 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
             </p>
           )}
 
-          <div className="rounded-2xl bg-surface p-5 shadow-sm">
-            <p className="font-serif text-lg font-semibold text-ink">Financing, as an example</p>
-            <p className="mt-1 text-base text-ink">
-              Decision: {np.prequal.decision}
-              {np.prequal.apr ? `, about ${(np.prequal.apr * 100).toFixed(1)}% APR` : ""}
-              {np.prequal.max_amount ? `, up to ${usd(np.prequal.max_amount)}` : ""}.
+          <div className="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-line">
+            <p className="font-serif text-lg font-semibold text-ink">Financing, in plain words</p>
+            <p className="mt-1 max-w-prose text-base text-ink">
+              {np.prequal.decision === "PREQUALIFIED"
+                ? `With a credit score of ${result.credit.score}, a lender would likely lend you up to ${usd(np.prequal.max_amount)} for your next car, at about ${(np.prequal.apr * 100).toFixed(1)}% a year. On a ${usd(np.prequal.max_amount)} loan over 5 years that is about ${usd(monthly(np.prequal.max_amount, np.prequal.apr, 60))} a month.`
+                : np.prequal.decision === "DECLINE"
+                  ? `With a credit score of ${result.credit.score}, a loan is unlikely right now. Plan to buy with the cash you walk away with.`
+                  : "There is no credit score on file, so a lender would need to look at your situation by hand."}
             </p>
-            <p className="mt-1 text-sm text-muted">
-              This is an illustration, not a lender&apos;s offer. {np.prequal.note}
+            <p className="mt-2 text-sm text-muted">
+              Our illustration from your score, not a lender&apos;s offer. {np.prequal.note}
             </p>
           </div>
 

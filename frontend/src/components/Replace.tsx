@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { Json, post, usd } from "@/lib/api";
 import { Badge, Button, inputCls } from "./ui";
@@ -19,12 +18,9 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-const LiveAuctionPanel = dynamic(() => import("./live/LiveBits").then((m) => m.LiveAuctionPanel), { ssr: false });
-const LIVE = !!process.env.NEXT_PUBLIC_SPACETIME_DB;
-// An auction win has a `car` string and null year/make/model; listings have the parts.
-const carName = (c: Json) => c.car ?? `${c.year} ${c.make} ${c.model} ${c.trim ?? ""}`.trim();
-
+const carName = (c: Json) => `${c.year} ${c.make} ${c.model} ${c.trim ?? ""}`.trim();
 const parseNum = (s: string) => (s.trim() === "" ? NaN : Number(s));
+const when = (iso: string) => new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
 
 function CardSkeleton() {
   return (
@@ -37,18 +33,17 @@ function CardSkeleton() {
   );
 }
 
-const verdictLabel = (v: string) => (v.startsWith("OK") ? "OK" : v.startsWith("STOP") ? "STOP" : "CAUTION");
-
-export default function Replace({ id, personas, cap, setCap, onPurchased }: {
-  id: string; personas: Json[]; cap: string; setCap: (v: string) => void; onPurchased: () => void;
-}) {
+export default function Replace({ id, personas, onPurchased }: { id: string; personas: Json[]; onPurchased: () => void }) {
   const [data, setData] = useState<Json | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [checks, setChecks] = useState<Record<string, Json>>({});
   const [sellerPersona, setSellerPersona] = useState("P08");
+  const [cap, setCap] = useState("1000");
+  const [mandate, setMandate] = useState<Json | null>(null);
   const [hold, setHold] = useState<Json | null>(null);
   const [deposit, setDeposit] = useState("500");
+  const [card, setCard] = useState("4242 4242 4242 4242");
   const [consentKey, setConsentKey] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Json | null>(null);
   const [busy, setBusy] = useState("");
@@ -69,15 +64,17 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
   const capNum = parseNum(cap);
   const depositOk = Number.isFinite(depositNum) && depositNum > 0;
   const capOk = Number.isFinite(capNum) && capNum > 0;
-  const inputsOk = depositOk && capOk;
-  const consent = consentKey === `${deposit}|${cap}`;
+  const consent = consentKey === `${hold?.vin}|${deposit}|${card}`;
+  const passed = Object.values(checks).filter((c) => c.clean);
+  const inMandate = new Set<string>((mandate?.sellers ?? []).map((s: Json) => s.vin));
+  // The mandate is stale when a seller passed the check after it was granted.
+  const stale = !!mandate && passed.some((c) => !inMandate.has(c.vin));
 
-  async function checkSeller(vin: string) {
-    setBusy(vin);
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(label);
     setError(null);
     try {
-      const r = await post(`/api/claims/${id}/seller-check`, { vin, persona: sellerPersona });
-      setChecks((prev) => ({ ...prev, [vin]: r }));
+      await fn();
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -85,27 +82,23 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
     }
   }
 
-  async function pay() {
+  const checkSeller = (vin: string) => run(vin, async () => {
+    const r = await post(`/api/claims/${id}/seller-check`, { vin, persona: sellerPersona });
+    setChecks((prev) => ({ ...prev, [vin]: r }));
+  });
+
+  const grant = () => run("mandate", async () => {
+    setMandate(await post(`/api/claims/${id}/mandate`, { spending_cap: capNum }));
+    setHold(null);
+  });
+
+  const pay = () => run("pay", async () => {
     if (!hold) return;
-    if (!inputsOk) {
-      setError("Enter a deposit and a spending cap that are more than $0.");
-      return;
-    }
-    setBusy("pay");
-    setError(null);
-    try {
-      const r = await post(`/api/claims/${id}/checkout`, {
-        vin: hold.vin, deposit: depositNum, spending_cap: capNum, consent,
-      });
-      setReceipt(r);
-      setHold(null);
-      onPurchased();
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy("");
-    }
-  }
+    const r = await post(`/api/claims/${id}/checkout`, { vin: hold.vin, deposit: depositNum, consent, card_number: card });
+    setReceipt(r);
+    setHold(null);
+    onPurchased();
+  });
 
   if (!data) {
     if (loadError) {
@@ -127,140 +120,170 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="rounded-2xl bg-brand-soft p-5">
         <div className="flex flex-wrap items-center gap-2 text-base text-muted">
-          Your budget
+          Your buying power
           <Badge tone={data.source === "demo" ? "amber" : "green"}>{data.source}</Badge>
         </div>
         <div className="font-serif text-4xl font-semibold tracking-tight text-ink">{usd(data.budget)}</div>
         <p className="mt-1 text-base text-ink">
           {usd(data.walk_away)} in cash you walk away with
           {data.financing?.max_amount ? `, plus up to ${usd(data.financing.max_amount)} in prequalified financing` : ""}.
+          The same listings that show the insurer underpaid you are now your shopping list.
         </p>
       </div>
 
-      {LIVE && (
-        <LiveAuctionPanel
-          claimId={id}
-          onAwarded={(win) => {
-            setChecks((prev) => ({ ...prev, [win.vin]: { verdict: "OK: dealer chosen in the live auction" } }));
-            setHold(win);
-            setConsentKey(null);
-          }}
-        />
-      )}
+      <section>
+        <h3 className="font-serif text-xl font-semibold text-ink">1. Check sellers before any money moves</h3>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label htmlFor="seller-persona" className="text-base text-ink">Check sellers as</label>
+          <select id="seller-persona" className={`${inputCls} !w-auto max-w-full`} value={sellerPersona} onChange={(e) => setSellerPersona(e.target.value)}>
+            {personas.map((p) => <option key={p.id} value={p.id}>{p.id} {p.name} ({p.profile})</option>)}
+          </select>
+          <span className="text-sm text-muted">Test identity for the CRS sandbox.</span>
+        </div>
 
-      <h3 className="font-serif text-xl font-semibold text-ink">Or pick from today&apos;s listings</h3>
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <label htmlFor="seller-persona" className="text-base text-ink">Check sellers as</label>
-        <select id="seller-persona" className={`${inputCls} !w-auto max-w-full`} value={sellerPersona} onChange={(e) => setSellerPersona(e.target.value)}>
-          {personas.map((p) => <option key={p.id} value={p.id}>{p.id} {p.name} ({p.profile})</option>)}
-        </select>
-        <span className="text-sm text-muted">Demo identity for the CRS sandbox.</span>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {data.shortlist.map((l: Json) => {
-          const chk = checks[l.vin];
-          const label = chk ? verdictLabel(chk.verdict) : null;
-          const stop = label === "STOP";
-          const title = `${l.year} ${l.make} ${l.model} ${l.trim ?? ""}`.trim();
-          return (
-            <div key={l.vin} className="flex flex-col rounded-2xl bg-cream p-5">
-              <div className="text-lg font-semibold text-ink">
-                {l.url ? <a className="underline underline-offset-4" href={l.url} target="_blank" rel="noreferrer">{title}</a> : title}
-              </div>
-              <div className="mt-2 font-serif text-4xl font-semibold tracking-tight text-ink">{usd(l.price)}</div>
-              <div className="mt-1 text-base font-medium">
-                {l.value_gap > 0 ? <span className="text-brand">{usd(l.value_gap)} under market</span>
-                  : l.value_gap < 0 ? <span className="text-amber">{usd(-l.value_gap)} over market</span>
-                    : <span className="text-muted">At market price</span>}
-              </div>
-              <div className="mt-2 text-sm text-muted">
-                {l.mileage != null ? `${l.mileage.toLocaleString()} mi · ` : ""}
-                {l.distance_mi != null ? `${l.distance_mi} mi away · ` : ""}
-                {l.seller_name ?? "Seller"} ({l.seller_type ?? "unknown"})
-              </div>
-              {chk && (
-                <div className="mt-3 rounded-xl bg-surface p-3">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={label === "OK" ? "green" : stop ? "red" : "amber"}>{label}</Badge>
-                    <span className="text-base font-medium text-ink">
-                      {label === "OK" ? "Seller looks fine" : stop ? "Do not buy from this seller" : "Be careful with this seller"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">Identity: {chk.identity_detail}. Records: {chk.records_detail}. ({chk.source})</p>
+        <ol className="mt-4 grid gap-4 sm:grid-cols-2">
+          {data.shortlist.map((l: Json) => {
+            const chk = checks[l.vin];
+            const over = l.value_gap < 0;
+            return (
+              <li key={l.vin} className="flex flex-col rounded-2xl bg-cream p-5">
+                <div className="text-lg font-semibold text-ink">
+                  {l.url ? <a className="underline underline-offset-4" href={l.url} target="_blank" rel="noreferrer">{carName(l)}</a> : carName(l)}
                 </div>
-              )}
-              <div className="mt-4 flex flex-wrap gap-3 pt-1">
-                <Button variant="secondary" onClick={() => checkSeller(l.vin)} disabled={!!busy}>
-                  {busy === l.vin ? "Checking…" : chk ? "Check again" : "Check seller"}
-                </Button>
-                <Button onClick={() => { setHold(l); setConsentKey(null); }} disabled={!chk || stop}>
-                  Hold this car
-                </Button>
-              </div>
-              {!chk && <p className="mt-2 text-sm text-muted">Check the seller first to hold this car.</p>}
-            </div>
-          );
-        })}
-      </div>
-      {data.shortlist.length === 0 && <p className="text-base text-muted">No cars fit your budget right now.</p>}
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-3">
+                  <span className="font-serif text-4xl font-semibold tracking-tight text-ink">{usd(l.price)}</span>
+                  {over ? <Badge tone="amber">{usd(-l.value_gap)} above market</Badge>
+                    : l.value_gap > 0 ? <Badge tone="green">{usd(l.value_gap)} under market</Badge> : null}
+                </div>
+                <p className="mt-2 text-base text-ink">
+                  {l.why}{chk?.clean ? ", and the seller passed the check." : "."}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {l.seller_name ?? "Seller"} ({l.seller_type ?? "unknown"}) · market value {usd(l.market_value)} from {l.market_basis}
+                </p>
+                {chk && (
+                  <div className={`mt-3 rounded-xl p-3 ${chk.clean ? "bg-surface" : "bg-alert-soft"}`}>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={chk.clean ? "green" : "red"}>{chk.clean ? "Passed" : "Deposit locked"}</Badge>
+                      <span className="text-base font-medium text-ink">{chk.clean ? "Identity verified, no liens or judgments" : "Do not send money to this seller yet"}</span>
+                    </div>
+                    {chk.flags.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-alert">
+                        {chk.flags.map((f: string) => <li key={f}>{f}</li>)}
+                      </ul>
+                    )}
+                    <p className="mt-1 text-sm text-muted">CRS {chk.source === "demo" ? "demo data" : "sandbox"} · {chk.name}</p>
+                  </div>
+                )}
+                <div className="mt-auto flex flex-wrap gap-3 pt-4">
+                  <Button variant="secondary" onClick={() => checkSeller(l.vin)} disabled={!!busy}>
+                    {busy === l.vin ? "Checking…" : chk ? "Check again" : "Check seller"}
+                  </Button>
+                  {inMandate.has(l.vin) && chk?.clean && !receipt && (
+                    <Button onClick={() => { setHold(l); setConsentKey(null); }}>Hold this car</Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        {data.shortlist.length === 0 && <p className="text-base text-muted">No cars fit your budget right now.</p>}
+      </section>
 
-      {hold && (
-        <div className="rounded-2xl bg-brand-soft p-6">
-          <h3 className="font-serif text-2xl font-semibold text-ink">Approve this charge</h3>
+      <section className="rounded-2xl ring-1 ring-line">
+        <div className="border-b border-line p-5">
+          <h3 className="font-serif text-xl font-semibold text-ink">2. Set the agent&apos;s mandate</h3>
+          <p className="mt-1 max-w-prose text-base text-muted">
+            Before anything is spent, you decide the limits. The checkout refuses anything outside them.
+          </p>
+        </div>
+        <div className="grid gap-5 p-5 sm:grid-cols-2">
+          <dl className="space-y-3">
+            <div><dt className="text-sm text-muted">Budget for the car</dt><dd className="text-lg font-semibold text-ink">{usd(data.budget)}</dd></div>
+            <div>
+              <dt className="text-sm text-muted">Sellers that passed the check</dt>
+              <dd className="text-base text-ink">
+                {passed.length ? passed.map((c) => data.shortlist.find((l: Json) => l.vin === c.vin)?.seller_name ?? c.vin).join(", ") : "None yet. Check a seller above."}
+              </dd>
+            </div>
+            <div><dt className="text-sm text-muted">Expires</dt><dd className="text-base text-ink">{mandate ? when(mandate.expires_at) : "48 hours after you grant it"}</dd></div>
+            <label className="block text-base font-medium text-ink">
+              Spending cap ($)
+              <input className={`${inputCls} mt-1`} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} aria-invalid={!capOk} />
+            </label>
+          </dl>
+          <div>
+            <p className="text-sm font-semibold text-ink">The agent cannot</p>
+            <ul className="mt-2 space-y-1.5 text-base text-ink">
+              {(mandate?.cannot ?? [
+                "Charge more than the spending cap",
+                "Pay a seller that failed or skipped the check",
+                "Buy the car, sign a contract or take out a loan",
+                "Charge your card without your approval on the next screen",
+                "Act after the mandate expires in 48 hours",
+              ]).map((c: string) => (
+                <li key={c} className="flex gap-2"><span aria-hidden="true" className="text-alert">✕</span>{c}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line p-5">
+          <Button onClick={grant} disabled={!capOk || !passed.length || busy === "mandate" || (!!mandate && !stale && Number(mandate.spending_cap) === capNum)}>
+            {busy === "mandate" ? "Granting…" : mandate ? "Update mandate" : "Grant this mandate"}
+          </Button>
+          {mandate && !stale && <Badge tone="green">Granted {mandate.id}</Badge>}
+          {stale && <span className="text-sm text-amber">A new seller passed. Update the mandate to include them.</span>}
+        </div>
+      </section>
+
+      {hold && mandate && (
+        <section className="rounded-2xl bg-brand-soft p-6">
+          <h3 className="font-serif text-2xl font-semibold text-ink">3. Approve this charge</h3>
           <p className="mt-2 max-w-prose text-base text-ink">
-            We place a refundable deposit on the {carName(hold)} ({usd(hold.price)}) from {hold.seller_name}.
+            A refundable deposit on the {carName(hold)} ({usd(hold.price)}) from {hold.seller_name}.
             It holds the car for 48 hours, counts toward the price if you buy, and is refunded if you do not.
           </p>
           <div className="mt-4 grid max-w-xl gap-4 sm:grid-cols-2">
             <label className="block text-base font-medium text-ink">
               Deposit ($)
               <input className={`${inputCls} mt-1`} inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} aria-invalid={!depositOk} />
+              <span className="mt-1 block text-sm font-normal text-muted">Your cap is {usd(mandate.spending_cap, true)}.</span>
             </label>
             <label className="block text-base font-medium text-ink">
-              Your spending cap ($)
-              <input className={`${inputCls} mt-1`} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} aria-invalid={!capOk} />
-              <span className="mt-1 block text-sm font-normal text-muted">The same cap covers the rental and your next car.</span>
+              Visa test card
+              <input className={`${inputCls} mt-1 font-mono`} inputMode="numeric" autoComplete="off" value={card} onChange={(e) => setCard(e.target.value)} />
+              <span className="mt-1 block text-sm font-normal text-muted">Test mode: only test numbers work. No real charge.</span>
             </label>
           </div>
-          {!inputsOk && (
-            <p role="alert" className="mt-3 text-base text-alert">
-              {!depositOk ? "Enter a deposit that is more than $0." : "Enter a spending cap that is more than $0."}
-            </p>
-          )}
           <label className="mt-5 flex items-start gap-3 text-base text-ink">
             <input
               type="checkbox"
               className="mt-1 size-5 accent-brand"
               checked={consent}
-              disabled={!inputsOk}
-              onChange={(e) => setConsentKey(e.target.checked ? `${deposit}|${cap}` : null)}
+              disabled={!depositOk}
+              onChange={(e) => setConsentKey(e.target.checked ? `${hold.vin}|${deposit}|${card}` : null)}
             />
-            <span>I approve a {depositOk ? usd(depositNum, true) : "$0"} charge to my Visa card. No other charges.</span>
+            <span>I approve one {depositOk ? usd(depositNum, true) : "$0"} hold on this test card. No other charges.</span>
           </label>
-          <p className="mt-2 max-w-prose text-sm text-muted">
-            This is a simulated Visa checkout for the demo. No real payment is made and no card is charged.
-          </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={pay} disabled={!consent || !inputsOk || busy === "pay"}>{busy === "pay" ? "Paying…" : "Pay deposit"}</Button>
+            <Button onClick={pay} disabled={!consent || !depositOk || busy === "pay"}>{busy === "pay" ? "Placing hold…" : "Place deposit"}</Button>
             <Button variant="secondary" onClick={() => setHold(null)}>Cancel</Button>
           </div>
-        </div>
+        </section>
       )}
       {error && <p role="alert" className="rounded-xl bg-alert-soft px-4 py-3 text-base text-alert">{error}</p>}
 
       {receipt && (
-        <div className="rounded-2xl bg-brand-soft p-6">
+        <section className="rounded-2xl bg-brand-soft p-6">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-serif text-2xl font-semibold text-ink">Car held</h3>
-            <Badge tone="amber">simulated</Badge>
+            <Badge tone="amber">test mode</Badge>
           </div>
           <p className="mt-1 text-base text-muted">
-            Receipt {receipt.id} · {carName(receipt.car)} · {receipt.network}
+            Receipt {receipt.id} · {carName(receipt.car)} · {receipt.network} ending {receipt.card_last4}
           </p>
           <ul className="mt-4 divide-y divide-line">
             {receipt.lines.map((ln: Json) => (
@@ -277,11 +300,19 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
               <div className="font-serif text-2xl font-semibold text-ink">{usd(receipt.total, true)}</div>
             </li>
           </ul>
-          <p className="text-base text-ink">
+          <div className="mt-2 rounded-xl bg-surface p-4">
+            <p className="text-sm font-semibold text-ink">Stayed inside mandate {receipt.mandate_id}</p>
+            <ul className="mt-2 space-y-1 text-base text-ink">
+              {receipt.within_mandate.map((w: string) => (
+                <li key={w} className="flex gap-2"><span aria-hidden="true" className="text-brand">✓</span>{w}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="mt-4 text-base text-ink">
             <span className="font-semibold text-brand">{usd(receipt.remaining_under_cap, true)} left</span> under your{" "}
-            {usd(receipt.spending_cap, true)} spending cap, counting both holds.
+            {usd(receipt.spending_cap, true)} cap. {receipt.verified_buyer}
           </p>
-        </div>
+        </section>
       )}
     </div>
   );

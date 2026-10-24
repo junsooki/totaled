@@ -16,13 +16,13 @@ export function Button({
 }) {
   const styles =
     variant === "primary"
-      ? "bg-brand text-white hover:bg-brand-dark shadow-sm"
-      : "bg-surface text-brand ring-1 ring-inset ring-brand/40 hover:bg-brand-soft";
+      ? "bg-ink text-white hover:bg-brand shadow-[0_8px_18px_-10px_rgba(11,31,77,0.6)]"
+      : "bg-surface text-ink ring-1 ring-inset ring-line hover:bg-brand-soft hover:ring-brand/30";
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${styles}`}
+      className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-base font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${styles}`}
     >
       {children}
     </button>
@@ -31,7 +31,7 @@ export function Button({
 
 export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: string }) {
   return (
-    <div className="rounded-2xl bg-surface p-5 shadow-sm">
+    <div className="rounded-2xl bg-surface p-5 shadow-[0_0_0_1px_rgba(11,31,77,0.07),0_14px_30px_-14px_rgba(11,31,77,0.25)]">
       <div className="text-sm text-muted">{label}</div>
       <div className={`mt-1 font-serif text-3xl font-semibold tracking-tight ${tone ?? "text-ink"}`}>{value}</div>
     </div>
@@ -49,7 +49,7 @@ export function Badge({ children, tone = "zinc" }: { children: ReactNode; tone?:
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
+  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand";
 
 export type StepperStep = { label: string; done?: boolean; locked?: boolean };
 
@@ -85,7 +85,7 @@ export function Stepper({
           const isCurrent = i === current;
           const disabled = !!s.locked && !isCurrent;
           const circle = isCurrent
-            ? "bg-brand text-white ring-4 ring-brand-soft"
+            ? "bg-ink text-white ring-4 ring-brand-soft"
             : s.done
               ? "bg-brand-soft text-brand"
               : disabled
@@ -139,7 +139,7 @@ export function StepCard({
   footer?: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl bg-surface p-6 shadow-sm ring-1 ring-line sm:p-10">
+    <section className="rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_rgba(11,31,77,0.06),0_30px_60px_-30px_rgba(11,31,77,0.3)] sm:p-10">
       <h1 tabIndex={-1} className="font-serif text-3xl font-semibold tracking-tight text-ink outline-none sm:text-4xl">{title}</h1>
       {subtitle && <p className="mt-2 max-w-prose text-lg text-muted">{subtitle}</p>}
       {children && <div className="mt-8">{children}</div>}
@@ -159,16 +159,19 @@ export type SummaryRow = { label: string; value: ReactNode; tone?: "good" | "bad
  * (give the parent grid `lg:order-2` on its wrapper). Below lg it is a compact two-column block.
  */
 export function SummaryPanel({ title = "Your case", rows, children }: { title?: string; rows: SummaryRow[]; children?: ReactNode }) {
-  const toneCls = { good: "text-brand", bad: "text-alert", warn: "text-amber" };
+  const toneCls = { good: "text-[#a9bcff]", bad: "text-[#ffb1a8]", warn: "text-[#ffc79e]" };
   return (
-    <aside aria-label={title} className="rounded-3xl bg-brand-soft p-5 lg:sticky lg:top-6 lg:p-6">
-      <h2 className="font-serif text-xl font-semibold text-ink">{title}</h2>
+    <aside
+      aria-label={title}
+      className="rounded-[28px] bg-[linear-gradient(160deg,#1a2f78,#0b1f4d_55%,#0a1740)] p-5 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset,0_30px_60px_-24px_rgba(22,51,201,0.55)] lg:sticky lg:top-24 lg:p-6"
+    >
+      <h2 className="font-serif text-xl text-white">{title}</h2>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-1 lg:gap-y-4">
         {rows.map((r, i) => (
           <div key={i} className={r.big ? "col-span-2 lg:col-span-1" : ""}>
-            <dt className="text-sm text-muted">{r.label}</dt>
+            <dt className="text-sm text-white/60">{r.label}</dt>
             <dd
-              className={`${r.big ? "font-serif text-3xl font-semibold tracking-tight" : "text-base font-medium"} ${r.tone ? toneCls[r.tone] : "text-ink"}`}
+              className={`${r.big ? "font-serif text-3xl font-semibold tracking-tight" : "text-base font-medium"} ${r.tone ? toneCls[r.tone] : "text-white"}`}
             >
               {r.value}
             </dd>

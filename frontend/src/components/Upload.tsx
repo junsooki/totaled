@@ -28,6 +28,13 @@ const COMP: [string, string][] = [
   ["year", "Year"], ["trim", "Trim"], ["vin", "VIN"], ["seller_contact", "Contact"], ["distance_mi", "Miles away"],
   ["listing_date", "Listed"], ["odometer", "Odometer"], ["list_price", "Price"], ["adjusted_value", "Adjusted"],
 ];
+// The four yes/no questions that decide when to suggest a lawyer (backend/app/escalate.py).
+const SITUATION: [string, string][] = [
+  ["injured", "Was anyone injured?"],
+  ["fault_disputed", "Is fault disputed?"],
+  ["rideshare_or_commercial", "Was a rideshare or commercial vehicle involved?"],
+  ["other_at_fault_drivers", "Could other drivers share the fault?"],
+];
 const NUMERIC = new Set(["year", "mileage", "base_value", "condition_adjustment", "sales_tax", "title_fees",
   "registration_prorated", "deductible", "total", "distance_mi", "odometer", "list_price", "adjusted_value"]);
 
@@ -37,6 +44,8 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   const [stage, setStage] = useState<"add" | "check">("add");
   const [dragging, setDragging] = useState(false);
   const [draft, setDraft] = useState<{ id: string; claim: Json; by: string } | null>(null);
+  const [situation, setSituation] = useState<Record<string, boolean>>({});
+  const answered = SITUATION.every(([k]) => k in situation);
 
   async function start(files?: FileList | null) {
     setBusy(true);
@@ -62,6 +71,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
     setError(null);
     try {
       await put(`/api/claims/${draft.id}/claim`, draft.claim);
+      await put(`/api/claims/${draft.id}/situation`, situation);
       onConfirmed(draft.id, draft.claim);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -284,10 +294,37 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
         </div>
       </section>
 
+      <section>
+        <h2 className="font-serif text-2xl font-semibold text-ink">About the accident</h2>
+        <p className="mt-1 max-w-prose text-base text-muted">
+          Four quick questions. They decide whether we suggest talking to a lawyer. We never rate your case.
+        </p>
+        <div className="mt-4 divide-y divide-line">
+          {SITUATION.map(([k, q]) => (
+            <fieldset key={k} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <legend className="sr-only">{q}</legend>
+              <span aria-hidden="true" className="text-base text-ink">{q}</span>
+              <div className="flex gap-2">
+                {([["Yes", true], ["No", false]] as const).map(([label, val]) => (
+                  <label key={label} className={`cursor-pointer rounded-lg px-4 py-2 text-base font-medium ring-1 ring-inset focus-within:ring-2 focus-within:ring-brand ${situation[k] === val ? "bg-brand text-white ring-brand" : "bg-surface text-ink ring-line hover:bg-brand-soft"}`}>
+                    <input type="radio" name={k} className="sr-only" checked={situation[k] === val}
+                      onChange={() => setSituation({ ...situation, [k]: val })} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      </section>
+
       {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}
       <div className="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="secondary" onClick={() => setStage("add")} disabled={busy}>Back</Button>
-        <Button onClick={confirm} disabled={busy}>{busy ? "Saving…" : "These look right"}</Button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <Button onClick={confirm} disabled={busy || !answered}>{busy ? "Saving…" : "These look right"}</Button>
+          {!answered && <span className="text-sm text-muted">Answer the four questions to continue.</span>}
+        </div>
       </div>
     </div>
   );

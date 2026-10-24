@@ -143,7 +143,8 @@ def seller_check(pid: str, demo: bool) -> dict:
         blj = p["expected"]["blj"].split(": ", 1)[-1]
         records = 0 if blj.strip() == "0/0/0" else 1
         return {"persona": pid, "name": p["name"], "identity": idv, "identity_detail": idv_text,
-                "records": records, "records_detail": blj, "verdict": _verdict(idv, records), "source": "demo"}
+                "records": records, "records_detail": blj, "verdict": _verdict(idv, records),
+                "flags": _flags(idv, records), "source": "demo"}
 
     sr = _post("/transunion/identity-manager-verification/basic", p["idv_body"])
     msgs = (((sr.get("addOnProducts") or [{}])[0].get("idManagerVerification") or {}).get("messages")) or []
@@ -160,7 +161,7 @@ def seller_check(pid: str, demo: bool) -> dict:
     return {"persona": pid, "name": p["name"], "identity": idv,
             "identity_detail": "; ".join(f"{m.get('code')}: {m.get('text')}" for m in msgs) or "Identity verified",
             "records": records, "records_detail": ", ".join(f"{k} {v}" for k, v in counts.items()) or "No records",
-            "verdict": _verdict(idv, records), "source": "live"}
+            "verdict": _verdict(idv, records), "flags": _flags(idv, records), "source": "live"}
 
 
 def _verdict(idv: str, records: int) -> str:
@@ -171,3 +172,16 @@ def _verdict(idv: str, records: int) -> str:
     if idv == "STEP_UP":
         return "CAUTION: fraud alert; ask for more proof of identity"
     return "OK: identity verified, no liens or judgments"
+
+
+def _flags(idv: str, records: int) -> list:
+    """Each red flag in plain words. The deposit stays locked while any flag is open."""
+    flags = []
+    if idv == "FAIL":
+        flags.append("Identity mismatch: the seller's name, Social Security number or date of birth does not verify.")
+    if idv == "STEP_UP":
+        flags.append("Fraud alert on file: the seller has to prove who they are before any money moves.")
+    if records:
+        flags.append("Lien not cleared: liens or judgments are on record. A lien can follow the car, so get the title "
+                     "and a lien release first.")
+    return flags

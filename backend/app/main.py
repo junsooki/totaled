@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from . import ai, comps, crs, db, live  # noqa: E402
+from . import ai, comps, crs, db, live, playbook  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -140,6 +140,21 @@ def confirm_claim(cid: str, claim: Claim):
     return {"ok": True}
 
 
+class Situation(BaseModel):
+    injured: bool
+    fault_disputed: bool
+    rideshare_or_commercial: bool
+    other_at_fault_drivers: bool
+
+
+@app.put("/api/claims/{cid}/situation")
+def set_situation(cid: str, body: Situation):
+    _claim(cid)
+    db.update(cid, situation=body.model_dump())
+    db.log(cid, "situation", {"yes": sum(body.model_dump().values())})
+    return {"ok": True}
+
+
 @app.get("/api/claims/{cid}/page/{page}.png")
 def page_image(cid: str, page: int, quote: Optional[str] = None):
     """Render a report page, highlighting the quoted line (click to source)."""
@@ -246,6 +261,25 @@ def approve(cid: str, body: Approval):
     return {"ok": True, "approved_at": letter["approved_at"]}
 
 
+def _require_approved(cid: str) -> dict:
+    data = _claim(cid)
+    if not (data.get("letter") or {}).get("approved_at"):
+        raise HTTPException(400, "Approve the counteroffer letter first")
+    return data
+
+
+@app.get("/api/claims/{cid}/if-no")
+def if_they_say_no(cid: str):
+    return playbook.if_no(_require_approved(cid))
+
+
+@app.get("/api/claims/{cid}/case-package.md")
+def case_package(cid: str):
+    md = playbook.case_package(_require_approved(cid), db.events(cid))
+    return Response(md, media_type="text/markdown",
+                    headers={"Content-Disposition": f'attachment; filename="totaled-case-{cid}.md"'})
+
+
 # --- 4. Net payout -----------------------------------------------------------
 
 class PayoutRequest(BaseModel):
@@ -282,56 +316,31 @@ def payout(cid: str, body: PayoutRequest):
     return result
 
 
-# --- 5a. Rental --------------------------------------------------------------
+# --- 5. Next car ------------------------------------------------------------
 
-def _rental_options() -> list:
-    return json.loads((FIXTURES / "demo_rentals.json").read_text())["options"]
-
-
-class RentalRequest(BaseModel):
-    days: int = 14
+MANDATE_HOURS = 48
+# Visa test card numbers from payment providers' test modes. No real card is ever accepted.
+VISA_TEST_CARDS = {"4242424242424242", "4000056655665556", "4111111111111111"}
 
 
-@app.post("/api/claims/{cid}/rentals")
-def rentals(cid: str, body: RentalRequest):
-    _claim(cid)
-    if not 1 <= body.days <= 90:
-        raise HTTPException(422, "Days must be between 1 and 90")
-    options = [dict(o, total=round(o["daily_rate"] * body.days, 2)) for o in _rental_options()]
-    db.log(cid, "rentals", {"days": body.days, "count": len(options)})
-    return {"days": body.days, "options": options, "source": "demo"}
+def _market_value(l: dict, listings: list) -> tuple:
+    """A listing's market value from the same valuation code as the audit, when 3+ same-year listings exist."""
+    same = [x for x in listings if x.get("year") == l.get("year") and x.get("price") and x.get("mileage") is not None]
+    if len(same) >= 3 and l.get("mileage") is not None:
+        fv = fair_value(same, l["mileage"])
+        return fv["estimate"], f"our estimate from {fv['n_comps']} {l['year']} listings"
+    if l.get("expected_price"):
+        return l["expected_price"], "CarGurus expected price"
+    return l["price"], "no market estimate"
 
 
-class RentalCheckout(BaseModel):
-    rental_id: str
-    days: int
-    deposit: float
-    spending_cap: float
-    consent: bool
+def _why(rank: int, l: dict) -> str:
+    gap = l["value_gap"]
+    value = f"${gap:,.0f} under market" if gap > 0 else f"${-gap:,.0f} above market" if gap < 0 else "at market price"
+    miles = f", {l['mileage']:,} miles" if l.get("mileage") is not None else ""
+    away = f", {l['distance_mi']:g} miles away" if l.get("distance_mi") is not None else ""
+    return f"Ranked {rank} because it is {value}{miles}{away}"
 
-
-@app.post("/api/claims/{cid}/rental-checkout")
-def rental_checkout(cid: str, body: RentalCheckout):
-    """Simulated Visa hold for a rental car. No real payment is made."""
-    data = _claim(cid)
-    opt = next((o for o in _rental_options() if o["id"] == body.rental_id), None)
-    if not opt:
-        raise HTTPException(400, "Pick a rental from the options")
-    if not 1 <= body.days <= 90:
-        raise HTTPException(422, "Days must be between 1 and 90")
-    receipt = _simulated_receipt(
-        data, "purchase", body.deposit, body.spending_cap, body.consent,
-        "Refundable rental hold",
-        "A card hold, released when the car is returned. The rental cost is paid at the counter.",
-        rental={"agency": opt["agency"], "car_class": opt["car_class"], "example_car": opt["example_car"],
-                "daily_rate": opt["daily_rate"], "days": body.days,
-                "estimated_total": round(opt["daily_rate"] * body.days, 2)})
-    db.update(cid, rental=receipt)
-    db.log(cid, "rental_hold", {"rental_id": body.rental_id, "days": body.days, "amount": body.deposit, "simulated": True})
-    return receipt
-
-
-# --- 5b. Replace -------------------------------------------------------------
 
 @app.post("/api/claims/{cid}/replace")
 def replace(cid: str):
@@ -348,10 +357,13 @@ def replace(cid: str):
         raise HTTPException(502, f"Could not fetch replacement listings: {e}")
     within = [l for l in market["listings"] if l.get("price") and l["price"] <= budget]
     for l in within:
-        l["value_gap"] = (l.get("expected_price") or l["price"]) - l["price"]
+        l["market_value"], l["market_basis"] = _market_value(l, market["listings"])
+        l["value_gap"] = round(l["market_value"] - l["price"])
     ranked = sorted(within, key=lambda l: (-l["value_gap"], l.get("mileage") or 0))[:8]
+    for i, l in enumerate(ranked, 1):
+        l["why"] = _why(i, l)
     result = {"budget": round(budget, 2), "walk_away": np_["walk_away"], "financing": np_["prequal"],
-              "source": market["source"], "shortlist": ranked}
+              "source": market["source"], "fetched_at": market["fetched_at"], "shortlist": ranked}
     db.update(cid, replace=result)
     live.agent(cid, "Shopper", "done", f"{len(ranked)} cars under the ${result['budget']:,.0f} budget, ranked by value")
     db.log(cid, "shortlist", {"budget": result["budget"], "count": len(ranked)})
@@ -365,77 +377,142 @@ class SellerCheck(BaseModel):
 
 @app.post("/api/claims/{cid}/seller-check")
 def seller_check(cid: str, body: SellerCheck):
-    _claim(cid)
+    data = _claim(cid)
     _require_crs()
     try:
         result = crs.seller_check(body.persona, crs.demo_mode())
     except Exception as e:
         raise HTTPException(502, f"CRS seller check failed: {e}")
-    result["vin"] = body.vin
+    result.update(vin=body.vin, clean=not result["flags"], at=db.now())
+    db.update(cid, seller_checks=dict(data.get("seller_checks") or {}, **{body.vin: result}))
     db.log(cid, "seller_check", {"vin": body.vin, "persona": body.persona, "verdict": result["verdict"]})
     return result
+
+
+def _shortlisted(data: dict, vin: str) -> Optional[dict]:
+    return next((l for l in (data.get("replace") or {}).get("shortlist", []) if l["vin"] == vin), None)
+
+
+class MandateRequest(BaseModel):
+    spending_cap: float
+
+
+@app.post("/api/claims/{cid}/mandate")
+def grant_mandate(cid: str, body: MandateRequest):
+    """What the agent may spend, with whom and until when. Checkout refuses anything outside it."""
+    data = _claim(cid)
+    rep = data.get("replace")
+    if not rep:
+        raise HTTPException(400, "Find cars first")
+    if not math.isfinite(body.spending_cap) or body.spending_cap <= 0:
+        raise HTTPException(400, "The spending cap must be more than $0")
+    if body.spending_cap > rep["budget"]:
+        raise HTTPException(400, f"The spending cap can't be more than your ${rep['budget']:,.0f} budget")
+    sellers = []
+    for vin, chk in (data.get("seller_checks") or {}).items():
+        car = _shortlisted(data, vin)
+        if car and chk["clean"]:
+            sellers.append({"vin": vin, "seller_name": car.get("seller_name"), "price": car["price"],
+                            "car": f"{car['year']} {car['make']} {car['model']} {car.get('trim') or ''}".strip()})
+    if not sellers:
+        raise HTTPException(400, "No seller has passed the check yet. Only sellers that pass can be in the mandate.")
+    granted = datetime.now().astimezone()
+    mandate = {
+        "id": "MND-" + granted.strftime("%Y%m%d%H%M%S"),
+        "budget": rep["budget"],
+        "spending_cap": round(body.spending_cap, 2),
+        "sellers": sellers,
+        "granted_at": granted.isoformat(),
+        "expires_at": (granted + timedelta(hours=MANDATE_HOURS)).isoformat(),
+        "can": [f"Place one refundable hold deposit of up to ${body.spending_cap:,.2f}",
+                "Pay only a seller listed here, after the seller check passed",
+                f"Hold only a car priced inside your ${rep['budget']:,.0f} budget"],
+        "cannot": ["Charge more than the spending cap",
+                   "Pay a seller that failed or skipped the check",
+                   "Buy the car, sign a contract or take out a loan",
+                   "Charge your card without your approval on the next screen",
+                   f"Act after the mandate expires in {MANDATE_HOURS} hours"],
+    }
+    db.update(cid, mandate=mandate)
+    db.log(cid, "mandate", {"cap": mandate["spending_cap"], "sellers": len(sellers)})
+    return mandate
+
+
+def _luhn(n: str) -> bool:
+    digits = [int(d) for d in n][::-1]
+    return sum(d if i % 2 == 0 else (d * 2 - 9 if d > 4 else d * 2) for i, d in enumerate(digits)) % 10 == 0
 
 
 class Checkout(BaseModel):
     vin: str
     deposit: float
-    spending_cap: float
     consent: bool
-
-
-def _simulated_receipt(data: dict, other_key: str, deposit: float, spending_cap: float, consent: bool,
-                       label: str, why: str, **extra) -> dict:
-    """Shared consent and spending-cap rules for the rental hold and the car deposit.
-    The cap covers both holds, so the other purchase's total counts against it."""
-    if not consent:
-        raise HTTPException(400, "The user must approve the charge on the consent screen")
-    if not (math.isfinite(deposit) and math.isfinite(spending_cap)):
-        raise HTTPException(400, "Deposit and spending cap must be real numbers")
-    if deposit <= 0:
-        raise HTTPException(400, "Deposit must be positive")
-    other = float((data.get(other_key) or {}).get("total") or 0)
-    if deposit + other > spending_cap:
-        if other:
-            raise HTTPException(400, f"Deposit ${deposit:,.2f} plus ${other:,.2f} already held is "
-                                     f"${deposit + other:,.2f}, over your spending cap ${spending_cap:,.2f}")
-        raise HTTPException(400, f"Deposit ${deposit:,.2f} is over your spending cap ${spending_cap:,.2f}")
-    return {
-        "id": "SIM-" + datetime.now().strftime("%Y%m%d%H%M%S"),
-        "simulated": True,
-        "network": "Visa (simulated)",
-        **extra,
-        "lines": [
-            {"label": label, "amount": deposit, "why": why},
-            {"label": "Processing fee", "amount": 0.0, "why": "Simulated checkout: no fee is charged."},
-        ],
-        "total": deposit,
-        "spending_cap": spending_cap,
-        "remaining_under_cap": round(spending_cap - deposit - other, 2),
-        "at": db.now(),
-    }
+    card_number: str
 
 
 @app.post("/api/claims/{cid}/checkout")
 def checkout(cid: str, body: Checkout):
-    """Simulated Visa checkout for a refundable hold deposit. No real payment is made."""
+    """Test-mode checkout for a refundable hold deposit, inside the mandate. Only Visa test card numbers work."""
     data = _claim(cid)
     if not body.consent:
         raise HTTPException(400, "The user must approve the charge on the consent screen")
-    if body.deposit <= 0:
-        raise HTTPException(400, "Deposit must be positive")
-    car = next((l for l in (data.get("replace") or {}).get("shortlist", []) if l["vin"] == body.vin), None)
-    win = data.get("auction_win")
-    if not car and win and win["vin"] == body.vin:
-        car = win
+    if not math.isfinite(body.deposit) or body.deposit <= 0:
+        raise HTTPException(400, "Deposit must be more than $0")
+    car = _shortlisted(data, body.vin)
     if not car:
-        raise HTTPException(400, "Pick a car from the shortlist or the auction")
-    receipt = _simulated_receipt(
-        data, "rental", body.deposit, body.spending_cap, body.consent,
-        "Refundable hold deposit", "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't.",
-        car={k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")})
+        raise HTTPException(400, "Pick a car from the shortlist")
+    chk = (data.get("seller_checks") or {}).get(body.vin)
+    if not chk:
+        raise HTTPException(400, "The deposit is locked: check the seller first")
+    if not chk["clean"]:
+        raise HTTPException(400, "The deposit is locked. " + " ".join(chk["flags"]))
+    m = data.get("mandate")
+    if not m:
+        raise HTTPException(400, "Grant a spending mandate first")
+    if datetime.now().astimezone() > datetime.fromisoformat(m["expires_at"]):
+        raise HTTPException(400, "The mandate has expired. Grant a new one")
+    if body.vin not in {s["vin"] for s in m["sellers"]}:
+        raise HTTPException(400, "This seller is not in your mandate. Update the mandate to add it")
+    if car["price"] > m["budget"]:
+        raise HTTPException(400, f"The car's ${car['price']:,.0f} price is over your ${m['budget']:,.0f} budget")
+    held = float((data.get("purchase") or {}).get("total") or 0)
+    if body.deposit + held > m["spending_cap"]:
+        raise HTTPException(400, f"Blocked by your spending cap: a ${body.deposit:,.2f} deposit"
+                                 + (f" plus ${held:,.2f} already held" if held else "")
+                                 + f" is over your ${m['spending_cap']:,.2f} cap")
+    card = "".join(c for c in body.card_number if c.isdigit())
+    if card not in VISA_TEST_CARDS or not _luhn(card):
+        raise HTTPException(400, "Test mode accepts Visa test card numbers only, such as 4242 4242 4242 4242")
 
+    fin = data["replace"]["financing"]
+    receipt = {
+        "id": "TEST-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+        "test_mode": True,
+        "network": "Visa test card",
+        "card_last4": card[-4:],
+        "mandate_id": m["id"],
+        "car": {k: car.get(k) for k in ("vin", "year", "make", "model", "trim", "price", "seller_name")},
+        "lines": [
+            {"label": "Refundable hold deposit", "amount": body.deposit,
+             "why": "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't."},
+            {"label": "Processing fee", "amount": 0.0, "why": "Test mode: no fee and no real charge."},
+        ],
+        "total": round(body.deposit + held, 2),
+        "spending_cap": m["spending_cap"],
+        "remaining_under_cap": round(m["spending_cap"] - body.deposit - held, 2),
+        "within_mandate": [
+            f"Deposit ${body.deposit:,.2f} is within the ${m['spending_cap']:,.2f} spending cap",
+            f"{car.get('seller_name') or 'The seller'} passed the CRS seller check ({chk['source']})",
+            f"Car price ${car['price']:,.0f} is inside the ${m['budget']:,.0f} budget",
+            f"Placed before the mandate expires ({m['expires_at'][:16].replace('T', ' ')})",
+        ],
+        "verified_buyer": f"The seller gets a buyer whose budget (${m['budget']:,.0f}) and financing"
+                          + (f" (prequalified up to ${fin['max_amount']:,.0f})" if fin.get("max_amount") else "")
+                          + " are already verified.",
+        "at": db.now(),
+    }
     db.update(cid, purchase=receipt)
-    db.log(cid, "deposit", {"vin": body.vin, "amount": body.deposit, "simulated": True})
+    db.log(cid, "deposit", {"vin": body.vin, "amount": body.deposit, "test_mode": True})
     return receipt
 
 
@@ -517,6 +594,6 @@ def results(cid: str):
         "minutes_to_letter": minutes,
         "letter_approved": bool(letter.get("approved_at")),
         "purchase": data.get("purchase"),
-        "rental": data.get("rental"),
+        "mandate": data.get("mandate"),
         "events": db.events(cid),
     }

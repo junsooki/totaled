@@ -244,13 +244,19 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
       <Market listings={audit.market.listings} fair={fv} mileage={claim.vehicle.mileage} insurer={audit.insurer_comps ?? []} />
       {audit.market.listings.length > 0 && (
         <div>
-          <h4 className="font-semibold text-ink">Live listings behind the estimate</h4>
-          <ul className="mt-2 space-y-1 text-base text-muted">
-            {audit.market.listings.slice(0, 5).map((l: Json) => (
-              <li key={l.vin}>
-                {l.url ? <a className="text-brand underline" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
-                  : `${l.year} ${l.make} ${l.model} ${l.trim}`}
-                {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
+          <h4 className="font-semibold text-ink">Listings behind the estimate</h4>
+          <ul className="mt-2 divide-y divide-line text-base">
+            {audit.market.listings.map((l: Json) => (
+              <li key={l.vin} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+                <span className="text-ink">
+                  {l.url ? <a className="text-brand underline" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
+                    : `${l.year} ${l.make} ${l.model} ${l.trim}`}
+                  {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
+                </span>
+                <span className="flex items-center gap-2 text-sm text-muted">
+                  {l.source === "demo" ? "Saved demo listing" : `CarGurus via Apify${audit.market.fetched_at ? `, fetched ${new Date(audit.market.fetched_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}`}
+                  <Badge tone={audit.market.source === "live" ? "green" : "amber"}>{audit.market.source === "live" ? "live" : audit.market.source === "cached" ? "saved" : "demo"}</Badge>
+                </span>
               </li>
             ))}
           </ul>
