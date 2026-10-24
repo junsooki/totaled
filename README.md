@@ -1,12 +1,29 @@
 # Totaled
 
-An AI agent that checks an insurer's total loss offer against live market data, drafts an evidence-backed counteroffer, and helps the owner buy a replacement car. Cal Hacks 13.0.
+An AI agent that checks an insurer's total loss offer against California's rule (10 CCR § 2695.8) and live market data, drafts an evidence-backed counteroffer, works out what the owner actually walks away with, and helps buy the replacement car. Cal Hacks 13.0.
 
 Rule for the whole system: the AI reads and writes, code computes every dollar, and the user approves every action.
 
-## Status
+## The flow
 
-Friday night core path: type in a car and an offer, pull comparables from CarGurus through Apify, and show fair value (an Estimate) next to the offer.
+| # | Screen | What happens | Code |
+|---|---|---|---|
+| 1 | Upload | Claude reads the report PDF into structured fields; the user confirms each one | `backend/app/ai.py`, `frontend/src/components/Upload.tsx` |
+| 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate), gap in dollars, 35-day deadline | `backend/app/checks.py`, `valuation.py`, `comps.py` |
+| 3 | Counteroffer | Claude drafts the letter; every sentence cites evidence; code rejects any dollar amount not in the evidence; user edits then approves | `backend/app/letter.py`, `ai.py` |
+| 4 | Net payout | CRS credit report finds the auto loan, walk-away amount, negative equity and GAP, prequalification | `backend/app/crs.py` |
+| 5 | Replace | Ranked replacement cars in budget, CRS seller check (identity + liens), simulated Visa deposit under a spending cap with consent and an explained receipt | `backend/app/main.py`, `Replace.tsx` |
+
+The results card shows dollars at stake, checks failed and minutes from upload to approved letter, with an audit trail.
+
+## Live vs demo
+
+Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CRS return clearly labeled demo data so the whole flow can run without keys. Without `ANTHROPIC_API_KEY`, the sample report uses its known fields and the letter is a code template. The UI shows which mode each integration is in.
+
+- Apify: `e-commerce/cargurus-zipcode-search-scraper`; each run is cached and reused if a later run fails.
+- CRS: sandbox REST API, test personas only (`backend/app/fixtures/crs_personas.json`), never real credit data.
+- Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
+- Visa: simulated checkout, labeled as such.
 
 ## Run it
 
@@ -15,7 +32,7 @@ Backend (Python 3.9+):
 ```sh
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env   # add APIFY_TOKEN
+cp .env.example .env   # add keys, or set DEMO_MODE=1
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
@@ -24,10 +41,10 @@ Frontend:
 ```sh
 cd frontend
 npm install
-npm run dev            # http://localhost:3000
+npm run dev            # http://localhost:3000 (set NEXT_PUBLIC_API_URL if the API is elsewhere)
 ```
 
-Each Apify run is cached in `backend/data/cache/`. If a live run fails, the last cached run for the same search is used.
+Regenerate the sample report and demo listings: `cd backend && .venv/bin/python scripts/make_sample_report.py`.
 
 ## CRS MCP server (developer helper for Claude Code)
 

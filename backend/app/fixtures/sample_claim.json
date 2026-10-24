@@ -1,0 +1,141 @@
+{
+  "owner_zip": "94704",
+  "vehicle": {
+    "year": 2019,
+    "make": "Honda",
+    "model": "Civic",
+    "trim": "EX",
+    "vin": "2HGFC1F35KH654321",
+    "mileage": 48200,
+    "options": [
+      "Sunroof",
+      "Apple CarPlay",
+      "Heated Seats"
+    ]
+  },
+  "offer": {
+    "offer_date": "2026-10-14",
+    "base_value": 17050,
+    "condition_adjustment": -1150,
+    "sales_tax": 1629.75,
+    "title_fees": 75,
+    "registration_prorated": null,
+    "deductible": 500,
+    "total": 17104.75,
+    "written_explanation": true,
+    "source": {
+      "page": 1,
+      "quote": "Total Settlement Offer: $17,104.75"
+    }
+  },
+  "condition": {
+    "subject_grade": "Average",
+    "documented": false,
+    "deduction": 1150,
+    "source": {
+      "page": 1,
+      "quote": "Condition grade: Average   Condition adjustment: -$1,150.00"
+    }
+  },
+  "comparables": [
+    {
+      "id": "C1",
+      "year": 2019,
+      "make": "Honda",
+      "model": "Civic",
+      "trim": "LX",
+      "vin": "2HGFC2F57KH512345",
+      "stock_number": "VH4471",
+      "seller_name": "Valley Honda",
+      "seller_contact": "(510) 555-0142",
+      "distance_mi": 38,
+      "listing_date": "2026-09-20",
+      "odometer": 61400,
+      "options": [],
+      "list_price": 16450,
+      "adjustments": [
+        {
+          "label": "Mileage",
+          "amount": 1050
+        },
+        {
+          "label": "Equipment",
+          "amount": 600
+        }
+      ],
+      "adjusted_value": 18100,
+      "source": {
+        "page": 2,
+        "quote": "C1: 2019 Honda Civic LX   VIN 2HGFC2F57KH512345"
+      }
+    },
+    {
+      "id": "C2",
+      "year": 2019,
+      "make": "Honda",
+      "model": "Civic",
+      "trim": "EX",
+      "vin": null,
+      "stock_number": null,
+      "seller_name": "Private party",
+      "seller_contact": null,
+      "distance_mi": 42,
+      "listing_date": "2026-09-28",
+      "odometer": 52000,
+      "options": [
+        "Sunroof",
+        "Apple CarPlay"
+      ],
+      "list_price": 17200,
+      "adjustments": [
+        {
+          "label": "Mileage",
+          "amount": -400
+        },
+        {
+          "label": "Other",
+          "amount": -900
+        }
+      ],
+      "adjusted_value": 15900,
+      "source": {
+        "page": 2,
+        "quote": "C2: 2019 Honda Civic EX   VIN not provided"
+      }
+    },
+    {
+      "id": "C3",
+      "year": 2020,
+      "make": "Honda",
+      "model": "Civic",
+      "trim": "EX",
+      "vin": "19XFC1F38LE201987",
+      "stock_number": "F2210",
+      "seller_name": "Central Valley Auto",
+      "seller_contact": "(559) 555-0177",
+      "distance_mi": 214,
+      "listing_date": "2026-05-30",
+      "odometer": 44900,
+      "options": [
+        "Sunroof",
+        "Apple CarPlay"
+      ],
+      "list_price": 19300,
+      "adjustments": [
+        {
+          "label": "Mileage",
+          "amount": -300
+        },
+        {
+          "label": "Model year",
+          "amount": -1200
+        }
+      ],
+      "adjusted_value": 17800,
+      "source": {
+        "page": 2,
+        "quote": "C3: 2020 Honda Civic EX   VIN 19XFC1F38LE201987"
+      }
+    }
+  ]
+}

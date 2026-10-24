@@ -1,4 +1,4 @@
-"""Pull comparable listings from Apify and normalize them into one schema."""
+"""Pull market listings from Apify and normalize them into one schema."""
 import hashlib
 import json
 import os
@@ -8,10 +8,16 @@ from typing import List
 from apify_client import ApifyClient
 
 CARGURUS_ACTOR = "e-commerce/cargurus-zipcode-search-scraper"
-CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "cache"
+ROOT = Path(__file__).resolve().parent
+CACHE_DIR = Path(os.environ.get("CACHE_DIR", ROOT.parent / "data" / "cache"))
+DEMO_LISTINGS = ROOT / "fixtures" / "demo_listings.json"
 
 # The CarGurus Actor only accepts these radius values.
 RADIUS_OPTIONS = [10, 25, 50, 75, 100, 150, 200, 500]
+
+
+def demo_mode() -> bool:
+    return os.environ.get("DEMO_MODE") == "1"
 
 
 def _radius_label(miles: int) -> str:
@@ -30,6 +36,7 @@ def _normalize(item: dict) -> dict:
         "trim": item.get("trimName"),
         "body": item.get("bodyTypeName"),
         "price": item.get("price"),
+        "expected_price": item.get("expectedPrice"),
         "mileage": item.get("mileage"),
         "options": item.get("options") or [],
         "distance_mi": item.get("roundedDistance"),
@@ -54,14 +61,23 @@ def _dedupe(listings: List[dict]) -> List[dict]:
     return out
 
 
-def fetch_comps(year: int, make: str, model: str, mileage: int, zip_code: str, radius: int) -> dict:
-    """Run the CarGurus Actor; fall back to the last cached run for the same search."""
+def search(make: str, model: str, year_from: int, year_to: int, zip_code: str, radius: int) -> dict:
+    """Run the CarGurus Actor; fall back to the last cached run for the same search.
+
+    Returns {"listings": [...], "source": "live" | "cached" | "demo"}.
+    """
+    if demo_mode():
+        listings = [l for l in json.loads(DEMO_LISTINGS.read_text())
+                    if l["make"].lower() == make.lower() and l["model"].lower() == model.lower()
+                    and year_from <= l["year"] <= year_to]
+        return {"listings": listings, "source": "demo"}
+
     run_input = {
         "zips": [zip_code],
         "carBrands": [make],
         "carModels": [model],
-        "yearFrom": year,
-        "yearTo": year + 1,
+        "yearFrom": year_from,
+        "yearTo": year_to,
         "radius": _radius_label(radius),
     }
     key = hashlib.sha1(json.dumps(run_input, sort_keys=True).encode()).hexdigest()[:12]
@@ -74,8 +90,8 @@ def fetch_comps(year: int, make: str, model: str, mileage: int, zip_code: str, r
         listings = _dedupe([_normalize(i) for i in items])
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(json.dumps(listings))
-        return {"listings": listings, "cached": False}
+        return {"listings": listings, "source": "live"}
     except Exception:
         if cache_file.exists():
-            return {"listings": json.loads(cache_file.read_text()), "cached": True}
+            return {"listings": json.loads(cache_file.read_text()), "source": "cached"}
         raise
