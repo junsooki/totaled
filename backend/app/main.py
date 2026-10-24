@@ -2,6 +2,7 @@ import base64
 import json
 import math
 import os
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -19,6 +20,7 @@ from . import ai, comps, crs, db, live  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
+from .letter_pdf import build_letter_pdf  # noqa: E402
 from .schemas import Claim  # noqa: E402
 from .valuation import bridge, comparable_listings, counteroffer, fair_value  # noqa: E402
 
@@ -247,6 +249,20 @@ def approve(cid: str, body: Approval):
     db.update(cid, letter=letter)
     db.log(cid, "letter_approved", {"sentences": len(checked)})
     return {"ok": True, "approved_at": letter["approved_at"]}
+
+
+@app.get("/api/claims/{cid}/letter.pdf")
+def letter_pdf(cid: str):
+    data = _claim(cid)
+    letter = data.get("letter") or {}
+    if not letter.get("approved_at"):
+        raise HTTPException(409, "Approve the letter first")
+    date_text = datetime.fromisoformat(letter["approved_at"]).strftime("%B %d, %Y").replace(" 0", " ")
+    pdf = build_letter_pdf(data["claim"], letter, date_text)
+    name = re.sub(r"[^A-Za-z0-9_-]", "-", str(data["claim"].get("claim_number") or cid))
+    db.log(cid, "letter_downloaded", {})
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="counteroffer-letter-{name}.pdf"'})
 
 
 # --- 4. Net payout -----------------------------------------------------------

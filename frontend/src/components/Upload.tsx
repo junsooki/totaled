@@ -10,7 +10,8 @@ const filePrimary = `${fileBtn} border-b-[3px] border-brand-dark bg-brand text-w
 const fileSecondary = `${fileBtn} border-2 border-ink bg-surface text-ink hover:bg-brand-soft`;
 const linkCls =
   "cursor-pointer text-brand underline underline-offset-4 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline";
-const sectionH = "font-serif text-2xl font-semibold text-ink";
+const EXAMPLE_NOTE = "Another car ran a red light and hit my driver side. I was not hurt. Repairs were quoted at $9,800.";
+const sectionH ="font-serif text-2xl font-semibold text-ink";
 
 type Path = (string | number)[];
 
@@ -310,6 +311,13 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
             <span className="shrink-0">{(c.loss_note ?? "").length}/600</span>
           </span>
         </label>
+        <button
+          type="button"
+          className={`${linkCls} mt-1 text-base`}
+          onClick={() => setDraft({ ...draft, claim: { ...c, loss_note: EXAMPLE_NOTE } })}
+        >
+          Use an example
+        </button>
       </section>
 
       <section className="border-t border-line pt-6">

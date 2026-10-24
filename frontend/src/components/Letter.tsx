@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Json, post } from "@/lib/api";
+import { API, Json, post } from "@/lib/api";
 import { Button, Notice } from "./ui";
 
 export default function Letter({ id, letter, onApproved }: { id: string; letter: Json; onApproved: () => void }) {
@@ -12,6 +12,8 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
   const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const evidence = new Map<string, string>(letter.evidence.map((e: Json) => [e.id, e.fact]));
 
   async function approve() {
@@ -30,6 +32,27 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function downloadPdf() {
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      const res = await fetch(`${API}/api/claims/${id}/letter.pdf`);
+      if (!res.ok) throw new Error("Could not prepare the PDF. Try again.");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "counteroffer-letter.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setPdfError((e as Error).message || "Could not prepare the PDF. Try again.");
+    } finally {
+      setPdfBusy(false);
     }
   }
 
@@ -109,9 +132,13 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
         {approved ? (
           <div className="space-y-4">
             <Notice tone="good" title="Letter approved">
-              <p>Every dollar amount matches the evidence. You can copy the letter now.</p>
+              <p>Every dollar amount matches the evidence. You can copy the letter or download it as a PDF.</p>
             </Notice>
-            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(texts.join("\n\n"))}>Copy letter</Button>
+            <div className="flex flex-wrap gap-4">
+              <Button variant="secondary" onClick={() => navigator.clipboard.writeText(texts.join("\n\n"))}>Copy letter</Button>
+              <Button variant="secondary" onClick={downloadPdf} disabled={pdfBusy}>{pdfBusy ? "Preparing PDF…" : "Download as PDF"}</Button>
+            </div>
+            {pdfError && <Notice tone="bad"><p>{pdfError}</p></Notice>}
           </div>
         ) : (
           <div className="space-y-2">
