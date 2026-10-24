@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { Json, post, usd } from "@/lib/api";
 import { Badge, Button, inputCls } from "./ui";
@@ -17,6 +18,11 @@ function errMsg(e: unknown): string {
   }
   return e instanceof Error ? e.message : String(e);
 }
+
+const LiveAuctionPanel = dynamic(() => import("./live/LiveBits").then((m) => m.LiveAuctionPanel), { ssr: false });
+const LIVE = !!process.env.NEXT_PUBLIC_SPACETIME_DB;
+// An auction win has a `car` string and null year/make/model; listings have the parts.
+const carName = (c: Json) => c.car ?? `${c.year} ${c.make} ${c.model} ${c.trim ?? ""}`.trim();
 
 const parseNum = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
@@ -134,6 +140,19 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
         </p>
       </div>
 
+      {LIVE && (
+        <LiveAuctionPanel
+          claimId={id}
+          onAwarded={(win) => {
+            setChecks((prev) => ({ ...prev, [win.vin]: { verdict: "OK: dealer chosen in the live auction" } }));
+            setHold(win);
+            setConsentKey(null);
+          }}
+        />
+      )}
+
+      <h3 className="font-serif text-xl font-semibold text-ink">Or pick from today&apos;s listings</h3>
+
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <label htmlFor="seller-persona" className="text-base text-ink">Check sellers as</label>
         <select id="seller-persona" className={`${inputCls} !w-auto max-w-full`} value={sellerPersona} onChange={(e) => setSellerPersona(e.target.value)}>
@@ -194,7 +213,7 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
         <div className="rounded-2xl bg-brand-soft p-6">
           <h3 className="font-serif text-2xl font-semibold text-ink">Approve this charge</h3>
           <p className="mt-2 max-w-prose text-base text-ink">
-            We place a refundable deposit on the {hold.year} {hold.make} {hold.model} {hold.trim} ({usd(hold.price)}) from {hold.seller_name}.
+            We place a refundable deposit on the {carName(hold)} ({usd(hold.price)}) from {hold.seller_name}.
             It holds the car for 48 hours, counts toward the price if you buy, and is refunded if you do not.
           </p>
           <div className="mt-4 grid max-w-xl gap-4 sm:grid-cols-2">
@@ -241,7 +260,7 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
             <Badge tone="amber">simulated</Badge>
           </div>
           <p className="mt-1 text-base text-muted">
-            Receipt {receipt.id} · {receipt.car.year} {receipt.car.make} {receipt.car.model} {receipt.car.trim} · {receipt.network}
+            Receipt {receipt.id} · {carName(receipt.car)} · {receipt.network}
           </p>
           <ul className="mt-4 divide-y divide-line">
             {receipt.lines.map((ln: Json) => (

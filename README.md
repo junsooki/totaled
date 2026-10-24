@@ -25,9 +25,15 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
 - Visa: simulated checkout, labeled as such. Covers the rental hold and the car deposit; one spending cap applies to both.
 
-## Live tracker (SpacetimeDB)
+## Real-time core (SpacetimeDB)
 
-`spacetime/` is a SpacetimeDB module (TypeScript) published to Maincloud as `totaled-live`. The backend records each claim step through the module's `record_event` reducer (only the registered backend identity may write); `/track` on the website subscribes and updates instantly on any device. Public tables hold no personal data: claim ids, the car, dollar amounts and step names.
+`spacetime/` is a SpacetimeDB module (TypeScript) published to Maincloud as `totaled-live`. It is the live shared state for three things:
+
+- **Reverse auction** (`auction`, `dealer`, `bid`): once the payout is audited and financing prequalified, the buyer opens a live auction. Dealers join from `/dealer` on their phones (scan the QR code) and bid against each other in real time. The rules run inside the database, so no client can cheat: bids must fit the buyer's verified budget, a dealer can only lower their own price, a bid in the last 30 seconds extends the clock by 30 seconds, and only the backend can open or award an auction. The backend reads the winning bid back from SpacetimeDB before the deposit, never trusting the browser's price.
+- **Agents at work** (`agent_step`): the Reader, Appraiser, Negotiator and Shopper agents post each step as they work; every screen shows it live.
+- **Claim tracker** (`claim`, `claim_event`): `/track` follows every claim through the five steps, on any device.
+
+Public tables hold no personal data: claim ids, cars, dollar amounts, step names, dealer display names and a 3-digit ZIP area.
 
 - Publish: `cd spacetime && spacetime publish totaled-live --server maincloud`
 - Register the backend writer once: `cd backend && .venv/bin/python scripts/register_spacetime_writer.py totaled-live`, then set `SPACETIME_DB` and `SPACETIME_TOKEN` on the backend and `NEXT_PUBLIC_SPACETIME_DB` on the frontend.

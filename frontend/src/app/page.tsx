@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import Audit from "@/components/Audit";
 import Letter from "@/components/Letter";
@@ -11,6 +12,9 @@ import { Button, Stat, StepCard, Stepper, SummaryPanel, type SummaryRow } from "
 import { call, Json, post, usd } from "@/lib/api";
 
 const STEP_LABELS = ["Upload", "Audit", "Counteroffer", "Net payout", "Rental and car", "Summary"];
+
+const LiveAgentFeed = dynamic(() => import("@/components/live/LiveBits").then((m) => m.LiveAgentFeed), { ssr: false });
+const LIVE = !!process.env.NEXT_PUBLIC_SPACETIME_DB;
 
 export default function Home() {
   const [status, setStatus] = useState<Json | null>(null);
@@ -155,8 +159,9 @@ export default function Home() {
 
       <main className={`mt-8 grid flex-1 items-start gap-6 ${showPanel ? "lg:grid-cols-[minmax(0,1fr)_20rem]" : ""}`}>
         {showPanel && (
-          <div className="lg:order-2">
+          <div className="space-y-6 lg:sticky lg:top-6 lg:order-2 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
             <SummaryPanel rows={summaryRows} />
+            {LIVE && id && <LiveAgentFeed claimId={id} />}
           </div>
         )}
 

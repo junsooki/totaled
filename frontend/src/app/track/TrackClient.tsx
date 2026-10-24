@@ -2,20 +2,19 @@
 
 // Live claim tracker: subscribes to SpacetimeDB, so every step the backend records shows up instantly.
 import { useMemo, useState } from "react";
-import { SpacetimeDBProvider, useTable } from "spacetimedb/react";
+import { useTable } from "spacetimedb/react";
+import AgentFeed from "@/components/live/AgentFeed";
 import { Stat } from "@/components/ui";
 import { usd } from "@/lib/api";
-import { DbConnection, tables } from "@/module_bindings";
-
-const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST ?? "wss://maincloud.spacetimedb.com";
-const DB = process.env.NEXT_PUBLIC_SPACETIME_DB;
+import { LiveProvider } from "@/lib/live";
+import { tables } from "@/module_bindings";
 
 const STEPS: [string, string[]][] = [
   ["Upload", ["extracted", "confirmed"]],
   ["Audit", ["audited"]],
   ["Counteroffer", ["letter_drafted", "letter_approved"]],
   ["Net payout", ["payout"]],
-  ["Rental and next car", ["rentals", "rental_hold", "shortlist", "seller_check", "deposit"]],
+  ["Rental and next car", ["rentals", "rental_hold", "shortlist", "seller_check", "deposit", "auction_opened", "auction_awarded"]],
 ];
 const stepIndex = (kind: string) => STEPS.findIndex(([, kinds]) => kinds.includes(kind));
 
@@ -99,6 +98,7 @@ function Tracker() {
                     <Stat label="Checks failed" value={at >= 1 ? c.checksFailed : "—"} />
                     <Stat label="Walk away with" value={at >= 3 ? usd(c.walkAway) : "—"} tone="text-brand" />
                   </div>
+                  <div className="mt-6"><AgentFeed claimId={c.claimId} /></div>
                   {feed.length > 0 && (
                     <ul className="mt-6 space-y-1.5 text-sm text-muted">
                       {feed.map((e) => (
@@ -119,19 +119,6 @@ function Tracker() {
 }
 
 export default function TrackPage() {
-  const builder = useMemo(
-    () =>
-      DB
-        ? DbConnection.builder()
-            .withUri(HOST)
-            .withDatabaseName(DB)
-            .onConnect((conn) => {
-              conn.subscriptionBuilder().subscribe([tables.claim, tables.claimEvent]);
-            })
-        : null,
-    [],
-  );
-
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 font-sans text-ink sm:px-6">
       <h1 className="font-serif text-4xl font-semibold tracking-tight">Live claim tracker</h1>
@@ -139,13 +126,7 @@ export default function TrackPage() {
         Each step shows up here the moment it happens, on any device. Only public claim data is shown. No personal details.
       </p>
       <div className="mt-6">
-        {builder ? (
-          <SpacetimeDBProvider connectionBuilder={builder}>
-            <Tracker />
-          </SpacetimeDBProvider>
-        ) : (
-          <p className="text-base text-alert">NEXT_PUBLIC_SPACETIME_DB is not set.</p>
-        )}
+        <LiveProvider><Tracker /></LiveProvider>
       </div>
     </main>
   );
