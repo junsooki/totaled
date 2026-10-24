@@ -28,9 +28,10 @@ def _init():
     conn.execute("CREATE TABLE IF NOT EXISTS claims (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS events (claim_id TEXT NOT NULL, at TEXT NOT NULL, kind TEXT NOT NULL, "
                  "detail TEXT NOT NULL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS market_cache (key TEXT PRIMARY KEY, at TEXT NOT NULL, data TEXT NOT NULL)")
     if DATABASE_URL:  # Supabase exposes public tables over its REST API; RLS with no policies blocks that
-        conn.execute("ALTER TABLE claims ENABLE ROW LEVEL SECURITY")
-        conn.execute("ALTER TABLE events ENABLE ROW LEVEL SECURITY")
+        for t in ("claims", "events", "market_cache"):
+            conn.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
     conn.close()
 
 
@@ -83,3 +84,19 @@ def events(cid: str) -> list:
     rows = conn.execute(f"SELECT at, kind, detail FROM events WHERE claim_id = {p} ORDER BY at", (cid,)).fetchall()
     conn.close()
     return [{"at": a, "kind": k, "detail": json.loads(d)} for a, k, d in rows]
+
+
+def cache_get(key: str):
+    """Last saved market search for this key: (saved_at ISO string, listings) or None."""
+    conn, p = _connect()
+    row = conn.execute(f"SELECT at, data FROM market_cache WHERE key = {p}", (key,)).fetchone()
+    conn.close()
+    return (row[0], json.loads(row[1])) if row else None
+
+
+def cache_set(key: str, listings: list):
+    conn, p = _connect()
+    conn.execute(f"INSERT INTO market_cache (key, at, data) VALUES ({p}, {p}, {p}) "
+                 "ON CONFLICT (key) DO UPDATE SET at = excluded.at, data = excluded.data",
+                 (key, now(), json.dumps(listings)))
+    conn.close()

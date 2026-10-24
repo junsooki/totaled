@@ -40,6 +40,7 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
       <p className="text-xs text-zinc-500">
         {fv ? `Estimate: ${fv.method} over ${fv.n_comps} same-year, same-trim listings out of ${audit.market.searched} found. ` : "No matching listings found. "}
         Market data: <Badge tone={audit.market.source === "demo" ? "amber" : "zinc"}>{audit.market.source}</Badge>
+        {audit.market.fetched_at && ` CarGurus via Apify, fetched ${new Date(audit.market.fetched_at).toLocaleString()}.`}
         {" "}The counteroffer keeps the insurer&apos;s tax rate and fees and drops an undocumented condition deduction.
       </p>
 

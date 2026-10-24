@@ -172,7 +172,7 @@ def audit(cid: str):
         "checks": checks,
         "failed": sum(1 for r in checks if r["status"] == "fail"),
         "recomputed_base": recomputed_base,
-        "market": {"source": market["source"], "listings": matches, "fair_value": fv, "searched": len(market["listings"])},
+        "market": {"source": market["source"], "fetched_at": market["fetched_at"], "listings": matches, "fair_value": fv, "searched": len(market["listings"])},
         "counteroffer": co,
         "deadline": {"date": deadline.isoformat(), "days_left": (deadline - date.today()).days,
                      "insurer_exception_may_apply": reopen_exception(claim)},
