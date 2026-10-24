@@ -85,7 +85,7 @@ class Offer(BaseModel):
 
 
 class Claim(BaseModel):
-    owner_zip: str
+    owner_zip: str = ""
     insurer_name: Optional[str] = None  # copied from the report
     claim_number: Optional[str] = None  # copied from the report
     policy_number: Optional[str] = None  # copied from the report
@@ -95,3 +95,5 @@ class Claim(BaseModel):
     offer: Offer
     condition: Condition
     comparables: List[Comparable]
+
+    _zip_text = field_validator("owner_zip", mode="before")(lambda v: "" if v is None else v)

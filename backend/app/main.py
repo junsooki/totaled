@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import fitz
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,9 +96,6 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     else:
         raise HTTPException(503, "Reading a report or photos needs ANTHROPIC_API_KEY. Load the sample report or add the key.")
 
-    if sample and not claim.get("owner_zip"):
-        claim["owner_zip"] = "94704"  # the sample report prints no ZIP; 94704 is what the sample fixture and saved demo data use
-
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
                      "extracted_by": by, "created_at": db.now()})
     v = claim["vehicle"]
@@ -159,6 +157,65 @@ def page_image(cid: str, page: int, quote: Optional[str] = None):
         for rect in p.search_for(quote):
             p.add_highlight_annot(rect)
     return Response(p.get_pixmap(dpi=110).tobytes("png"), media_type="image/png")
+
+
+def _search_variants(text: str) -> List[str]:
+    """The text itself, plus the comma-grouped and plain forms of a number (search_for matches substrings)."""
+    out = [text]
+    try:
+        n = abs(float(text.replace(",", "").replace("$", "")))
+    except (ValueError, OverflowError):
+        return out
+    if not math.isfinite(n) or sum(c.isdigit() for c in text) < 3:
+        return out
+    whole = n == int(n)
+    plain = str(int(n)) if whole else f"{n:.2f}"
+    grouped = f"{int(n):,}" if whole else f"{n:,.2f}"
+    if whole and 1900 <= n <= 2100:
+        grouped = plain  # a year, not money
+    for v in (grouped, plain):
+        if v not in out:
+            out.append(v)
+    return out
+
+
+@app.get("/api/claims/{cid}/locate")
+def locate(cid: str, text: str = ""):
+    """Find where a value appears on the report PDF (fractions of the page size)."""
+    pdf = _claim(cid).get("pdf")
+    if not pdf:
+        return {"page_count": 0, "matches": []}
+    doc = fitz.open(stream=base64.b64decode(pdf), filetype="pdf")
+    text = text.strip()
+    if text:
+        for variant in _search_variants(text):
+            matches = []
+            for i, p in enumerate(doc):
+                w, h = p.rect.width, p.rect.height
+                for r in p.search_for(variant):
+                    matches.append({"page": i + 1, "x": r.x0 / w, "y": r.y0 / h, "w": r.width / w, "h": r.height / h})
+            if matches:
+                return {"page_count": doc.page_count, "matches": matches}
+    return {"page_count": doc.page_count, "matches": []}
+
+
+@app.get("/api/zip")
+def zip_from_location(lat: float, lon: float):
+    """Reverse-geocode a browser location to a US ZIP (OpenStreetMap Nominatim). Coordinates are not logged."""
+    if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+        raise HTTPException(422, "lat must be in [-90, 90] and lon in [-180, 180]")
+    try:
+        r = requests.get("https://nominatim.openstreetmap.org/reverse",
+                         params={"format": "jsonv2", "addressdetails": 1, "zoom": 18, "lat": lat, "lon": lon},
+                         headers={"User-Agent": "totaled-app"}, timeout=5)
+        r.raise_for_status()
+        postcode = (r.json().get("address") or {}).get("postcode") or ""
+    except (requests.RequestException, ValueError):
+        raise HTTPException(502, "The location service is not available right now.")
+    m = re.match(r"\d{5}", postcode)
+    if not m:
+        raise HTTPException(404, "No US ZIP found for that location.")
+    return {"zip": m.group(0)}
 
 
 # --- 2. Audit ----------------------------------------------------------------

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { API, Json, put } from "@/lib/api";
+import ReportPane, { Match } from "./ReportPane";
 import { Badge, Button, Notice, inputCls } from "./ui";
 
 const fileBtn =
@@ -11,6 +12,8 @@ const fileSecondary = `${fileBtn} border-2 border-ink bg-surface text-ink hover:
 const linkCls =
   "cursor-pointer text-brand underline underline-offset-4 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline";
 const EXAMPLE_NOTE = "Another car ran a red light and hit my driver side. I was not hurt. Repairs were quoted at $9,800.";
+// Used when the browser cannot tell us where the user is: the Palace of Fine Arts, San Francisco.
+const DEFAULT_ZIP = "94123";
 const sectionH ="font-serif text-2xl font-semibold text-ink";
 
 type Path = (string | number)[];
@@ -41,12 +44,106 @@ const DETAILS: [string, string][] = [
 const NUMERIC =new Set(["year", "mileage", "base_value", "condition_adjustment", "sales_tax", "title_fees",
   "registration_prorated", "deductible", "total", "distance_mi", "odometer", "list_price", "adjusted_value"]);
 
-export default function Upload({ onConfirmed }: { onConfirmed: (id: string, claim: Json) => void }) {
+export default function Upload({ onConfirmed, onWide }: { onConfirmed: (id: string, claim: Json) => void; onWide?: (wide: boolean) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<"add" | "check">("add");
   const [dragging, setDragging] = useState(false);
-  const [draft, setDraft] = useState<{ id: string; claim: Json; by: string } | null>(null);
+  const [draft, setDraft] = useState<{ id: string; claim: Json; by: string; isPdf: boolean } | null>(null);
+
+  // Report pane: highlight where a field's value appears on the PDF.
+  const [pageCount, setPageCount] = useState(0);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [notFound, setNotFound] = useState(false);
+  const [showPane, setShowPane] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const lookups = useRef(0);
+  const draftId = draft?.id;
+  const draftIsPdf = draft?.isPdf;
+
+  const locate = useCallback(async (value: unknown) => {
+    if (!draftId || !draftIsPdf) return null;
+    const text = value == null ? "" : String(value).trim();
+    const n = ++lookups.current;
+    try {
+      const res = await fetch(`${API}/api/claims/${draftId}/locate?text=${encodeURIComponent(text)}`);
+      if (!res.ok) return null;
+      const body = await res.json();
+      return n === lookups.current ? body : null;
+    } catch {
+      return null;
+    }
+  }, [draftId, draftIsPdf]);
+
+  async function highlight(value: unknown) {
+    clearTimeout(timer.current);
+    if (value == null || String(value).trim() === "") {
+      lookups.current++;
+      setMatches([]);
+      setNotFound(false);
+      return;
+    }
+    const body = await locate(value);
+    if (!body) return;
+    setPageCount(body.page_count);
+    setMatches(body.matches);
+    setNotFound(body.matches.length === 0);
+  }
+  const hl = (value: unknown) => ({
+    onFocus: () => highlight(value),
+    onMouseEnter: () => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => highlight(value), 150);
+    },
+  });
+  const hlLater = (value: unknown) => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => highlight(value), 400);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // The page count comes from an empty lookup.
+  useEffect(() => {
+    if (stage !== "check") return;
+    locate("").then((body) => body && setPageCount(body.page_count));
+  }, [stage, locate]);
+
+  const wide = stage === "check" && !!draftIsPdf && pageCount > 0;
+  useEffect(() => {
+    onWide?.(wide);
+    return () => onWide?.(false);
+  }, [wide, onWide]);
+
+  // ZIP: ask the browser where the user is, once per draft, when the check screen opens.
+  const [zipNote, setZipNote] = useState<"wait" | "found" | "default" | null>(null);
+  const zipAsked = useRef<string>(undefined);
+  useEffect(() => {
+    if (stage !== "check" || !draftId || zipAsked.current === draftId) return;
+    zipAsked.current = draftId;
+    if (draft?.claim?.owner_zip) return;
+    const fill = (zip: string, note: "found" | "default") => {
+      setDraft((d) => {
+        if (!d || d.id !== draftId || d.claim.owner_zip) return d;
+        setZipNote(note);
+        return { ...d, claim: { ...d.claim, owner_zip: zip } };
+      });
+    };
+    if (!navigator.geolocation) return fill(DEFAULT_ZIP, "default");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(`${API}/api/zip?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+          if (!res.ok) throw new Error();
+          fill((await res.json()).zip, "found");
+        } catch {
+          fill(DEFAULT_ZIP, "default");
+        }
+      },
+      () => fill(DEFAULT_ZIP, "default"),
+      { timeout: 8000, enableHighAccuracy: false },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, draftId]);
 
   async function start(files?: FileList | null) {
     setBusy(true);
@@ -54,10 +151,16 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
     try {
       const form = new FormData();
       for (const f of Array.from(files ?? [])) form.append("files", f);
+      const isPdf = Array.from(files ?? []).every((f) => f.type === "application/pdf");
+      setPageCount(0);
+      setMatches([]);
+      setNotFound(false);
+      setShowPane(false);
       const res = await fetch(`${API}/api/claims`, { method: "POST", body: form });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? res.statusText);
-      setDraft({ id: body.id, claim: body.claim, by: body.extracted_by });
+      setDraft({ id: body.id, claim: body.claim, by: body.extracted_by, isPdf });
+      setZipNote(body.claim.owner_zip ? null : "wait");
       setStage("check");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -149,9 +252,11 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
         className={inputCls}
         value={value ?? ""}
         placeholder="not in report"
+        {...hl(value)}
         onChange={(e) => {
           const raw = e.target.value;
           const v = raw === "" ? null : NUMERIC.has(key) ? Number(raw) : raw;
+          hlLater(v);
           setDraft({ ...draft!, claim: setIn(draft!.claim, path, v) });
         }}
       />
@@ -225,17 +330,30 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
 
   // Stage 2: check what we read.
   const c = draft.claim;
+  const zipOk = /^\d{5}$/.test(c.owner_zip ?? "");
   return (
-    <div className="space-y-10">
+    <div className={wide ? "lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start lg:gap-10" : ""}>
+      {wide && (
+        <div className="mb-6 lg:sticky lg:top-4 lg:mb-0">
+          <button type="button" className={`${linkCls} mb-3 text-base lg:hidden`}
+            aria-expanded={showPane} aria-controls="report-pane" onClick={() => setShowPane(!showPane)}>
+            {showPane ? "Hide report" : "Show report"}
+          </button>
+          <div id="report-pane" className={`${showPane ? "block" : "hidden"} lg:block`}>
+            <ReportPane id={draft.id} pageCount={pageCount} matches={matches} notFound={notFound} />
+          </div>
+        </div>
+      )}
+    <div className="@container min-w-0 space-y-10">
       <p className="text-lg text-muted">
         We read your report using <Badge>{draft.by}</Badge>. Fix anything that looks wrong, then confirm.
       </p>
 
       <section className="border-t border-line pt-6">
         <h2 className={sectionH}>Your car</h2>
-        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 @md:grid-cols-2 @2xl:grid-cols-3">
           {VEHICLE.map(([k, label]) => (
-            <div key={k} className={k === "vin" ? "sm:col-span-2" : ""}>
+            <div key={k} className={k === "vin" ? "@md:col-span-2" : ""}>
               {labeled(label, ["vehicle", k], k)}
               {k === "vin" && (
                 <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-base">
@@ -256,7 +374,29 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
               )}
             </div>
           ))}
-          <div>{labeled("Your ZIP", ["owner_zip"], "owner_zip")}</div>
+          <div>
+            <label className="block text-base font-medium text-ink">
+              <span className="mb-1 block">Your ZIP</span>
+              <input
+                className={inputCls}
+                value={c.owner_zip ?? ""}
+                inputMode="numeric"
+                maxLength={5}
+                aria-describedby="zip-note"
+                aria-invalid={!zipOk}
+                onChange={(e) => {
+                  setZipNote(null);
+                  setDraft({ ...draft, claim: { ...c, owner_zip: e.target.value } });
+                }}
+              />
+            </label>
+            <p id="zip-note" className="mt-1 text-base text-muted" aria-live="polite">
+              {zipNote === "wait" ? "Finding your ZIP…"
+                : zipNote === "found" ? "Filled from your location. Change it if it is wrong."
+                : zipNote === "default" ? `We could not get your location, so we used ${DEFAULT_ZIP} (the Palace of Fine Arts in San Francisco). Change it to your ZIP.`
+                : !zipOk ? "Enter a 5-digit ZIP." : ""}
+            </p>
+          </div>
         </div>
         <div className="mt-3 space-y-3" aria-live="polite">
           <p className="text-base text-muted">{vinNote ?? "The VIN is on the door-jamb sticker, the dashboard plate or your registration card."}</p>
@@ -270,7 +410,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
 
       <section className="border-t border-line pt-6">
         <h2 className={sectionH}>The insurer&apos;s offer</h2>
-        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 @md:grid-cols-2 @2xl:grid-cols-4">
           {OFFER.map(([k, label]) => labeled(label, ["offer", k], k))}
           {labeled("Condition deduction", ["condition", "deduction"], "deduction")}
           {labeled("Condition grade", ["condition", "subject_grade"], "subject_grade")}
@@ -282,14 +422,18 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
         <p className="mt-2 text-base text-muted">
           We read these from your report. They go into your letter. Leave any blank if you do not have it.
         </p>
-        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 @md:grid-cols-2">
           {DETAILS.map(([k, label]) => (
             <label key={k} className="block text-base font-medium text-ink">
               <span className="mb-1 block">{label}</span>
               <input
                 className={inputCls}
                 value={c[k] ?? ""}
-                onChange={(e) => setDraft({ ...draft, claim: { ...c, [k]: e.target.value === "" ? null : e.target.value } })}
+                {...hl(c[k])}
+                onChange={(e) => {
+                  hlLater(e.target.value);
+                  setDraft({ ...draft, claim: { ...c, [k]: e.target.value === "" ? null : e.target.value } });
+                }}
               />
             </label>
           ))}
@@ -326,7 +470,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
           {c.comparables.map((comp: Json, i: number) => (
             <li key={comp.id ?? i} className="py-6 first:pt-0 last:pb-0">
               <h3 className="font-serif text-xl font-semibold text-ink">{i + 1}. Comparable {comp.id}</h3>
-              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-5 @md:grid-cols-2 @2xl:grid-cols-5">
                 {COMP.map(([k, label]) => labeled(label, ["comparables", i, k], k))}
               </div>
               {comp.adjustments?.length > 0 && (
@@ -342,8 +486,9 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}
       <div className="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="secondary" onClick={() => setStage("add")} disabled={busy}>Back</Button>
-        <Button onClick={confirm} disabled={busy}>{busy ? "Saving…" : "These look right"}</Button>
+        <Button onClick={confirm} disabled={busy || !zipOk}>{busy ? "Saving…" : "These look right"}</Button>
       </div>
+    </div>
     </div>
   );
 }

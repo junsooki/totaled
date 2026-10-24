@@ -31,6 +31,7 @@ export default function Home() {
   const [error, setError] = useState<{ msg: string; at: number } | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [cur, setCur] = useState(0);
+  const [wide, setWide] = useState(false);
   // Steps the user has opened. Letter, Payout and rental/car stay mounted once opened so Back keeps their data.
   const [seen, setSeen] = useState<Record<number, boolean>>({});
   const auditStarted = useRef(false);
@@ -168,7 +169,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className={`min-w-0 ${showPanel ? "" : "mx-auto w-full max-w-3xl"}`}>
+        <div className={`min-w-0 ${showPanel || (cur === 0 && wide) ? "" : "mx-auto w-full max-w-3xl"}`}>
           {error && error.at === cur && (
             <div className="mb-6"><Notice tone="bad">{error.msg}</Notice></div>
           )}
@@ -189,6 +190,7 @@ export default function Home() {
                 </div>
               ) : (
                 <Upload
+                  onWide={setWide}
                   onConfirmed={(cid, c) => {
                     setId(cid);
                     setClaim(c);
