@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { API, Json, usd } from "@/lib/api";
 import { Badge, Stat } from "./ui";
+import { Bridge, Market } from "./ValueCharts";
 
 const tone = (s: string) => (s === "fail" ? "red" : s === "pass" ? "green" : "amber");
 
@@ -43,6 +44,13 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
         {audit.market.fetched_at && ` CarGurus via Apify, fetched ${new Date(audit.market.fetched_at).toLocaleString()}.`}
         {" "}The counteroffer keeps the insurer&apos;s tax rate and fees and drops an undocumented condition deduction.
       </p>
+
+      {audit.bridge?.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Bridge steps={audit.bridge} />
+          <Market listings={audit.market.listings} fair={fv} mileage={claim.vehicle.mileage} insurer={audit.insurer_comps ?? []} />
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <h3 className="mb-2 font-medium">The 10 checks · {audit.failed} failed</h3>

@@ -19,7 +19,7 @@ from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
 from .schemas import Claim  # noqa: E402
-from .valuation import comparable_listings, counteroffer, fair_value  # noqa: E402
+from .valuation import bridge, comparable_listings, counteroffer, fair_value  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REOPEN_DAYS = 35
@@ -174,6 +174,9 @@ def audit(cid: str):
         "recomputed_base": recomputed_base,
         "market": {"source": market["source"], "fetched_at": market["fetched_at"], "listings": matches, "fair_value": fv, "searched": len(market["listings"])},
         "counteroffer": co,
+        "bridge": bridge(claim, recomputed_base, fv["estimate"], co) if co else [],
+        "insurer_comps": [{"id": c.id, "odometer": c.odometer, "adjusted_value": c.adjusted_value, "trim": c.trim,
+                           "year": c.year} for c in claim.comparables],
         "deadline": {"date": deadline.isoformat(), "days_left": (deadline - date.today()).days,
                      "insurer_exception_may_apply": reopen_exception(claim)},
     }

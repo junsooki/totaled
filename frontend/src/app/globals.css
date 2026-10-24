@@ -24,3 +24,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Chart role tokens (dataviz reference palette; validated against these surfaces) */
+.viz-root {
+  --viz-surface: var(--background);
+  --viz-text: #0b0b0b;
+  --viz-text-2: #52514e;
+  --viz-text-3: #8a8983;
+  --viz-grid: #e9e8e4;
+  --viz-total: #0b0b0b;
+  --viz-up: #2a78d6;
+  --viz-down: #e34948;
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+}
+@media (prefers-color-scheme: dark) {
+  .viz-root {
+    --viz-text: #f0efec;
+    --viz-text-2: #c3c2b7;
+    --viz-text-3: #8f8e86;
+    --viz-grid: #2a2a28;
+    --viz-total: #f0efec;
+    --viz-up: #3987e5;
+    --viz-down: #e66767;
+    --viz-series-1: #3987e5;
+    --viz-series-2: #d95926;
+  }
+}
