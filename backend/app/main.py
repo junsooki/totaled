@@ -90,6 +90,9 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     else:
         raise HTTPException(503, "Reading a report or photos needs ANTHROPIC_API_KEY. Load the sample report or add the key.")
 
+    if sample and not claim.get("owner_zip"):
+        claim["owner_zip"] = "94704"  # the sample report prints no ZIP; 94704 is what the sample fixture and saved demo data use
+
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
                      "extracted_by": by, "created_at": db.now()})
     v = claim["vehicle"]
