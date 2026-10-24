@@ -24,6 +24,8 @@ either as a PDF or as phone photos of the pages (one photo per page; read them e
 Extract the claim as JSON. Rules:
 - Copy numbers exactly as printed. Do not compute, round or fill in anything that is not printed.
 - Leave a field null when the report does not state it (for example a missing VIN or seller contact).
+- For vehicle.trim and each comparable's trim, give only the trim level as the manufacturer names it
+  (for example "EX", "EX-L", "Sport"), without body style (sedan, coupe, 4D) or drivetrain.
 - Adjustments are signed: amounts that lower the comparable's value are negative.
 - condition.deduction is the positive dollar amount deducted for condition; documented is true only if
   inspection notes or photos support a below-average grade.

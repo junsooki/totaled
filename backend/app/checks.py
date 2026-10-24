@@ -29,11 +29,15 @@ CHECKS = [
 
 
 DRIVETRAINS = {"fwd", "awd", "rwd", "4wd", "2wd", "4x4"}
+BODY_STYLES = {
+    "4d", "2d", "4dr", "2dr", "4-door", "2-door", "4door", "2door", "sedan", "coupe",
+    "hatchback", "wagon", "suv", "crossover", "convertible",
+}
 
 
 def norm_trim(trim: Optional[str]) -> str:
-    """'EX FWD' and 'ex' compare equal; 'EX-L' stays different from 'EX'."""
-    return " ".join(w for w in (trim or "").lower().split() if w not in DRIVETRAINS)
+    """'EX 4D Sedan FWD' and 'ex' compare equal; 'EX-L' stays different from 'EX'."""
+    return " ".join(w for w in (trim or "").lower().split() if w not in DRIVETRAINS and w not in BODY_STYLES)
 
 
 def _days_between(a: str, b: str) -> int:
