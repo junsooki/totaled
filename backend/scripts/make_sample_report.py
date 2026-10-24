@@ -35,7 +35,10 @@ COMPS = [
 VEHICLE = dict(year=2019, make="Honda", model="Civic", trim="EX", vin="2HGFC1F35KH654321", mileage=48200,
                options=["Sunroof", "Apple CarPlay", "Heated Seats"])
 
-BASE = 17050  # the report's stated base value (the true average is 17,266.67)
+INSURER = dict(insurer_name="Golden State Mutual Insurance Co.", claim_number="CLM-2026-48213",
+               policy_number="CA-AUTO-7731904", policyholder_name="Jordan Rivera")
+
+BASE = 17050 # the report's stated base value (the true average is 17,266.67)
 COND = 1150
 TAXABLE = BASE - COND
 TAX = round(TAXABLE * 0.1025, 2)
@@ -63,7 +66,10 @@ def main():
 
     v = VEHICLE
     head = [("SAMPLE - FICTIONAL REPORT FOR DEMONSTRATION", 9), ("Market Valuation Report", 18),
-            ("Claim 26-CA-004417   Loss state: California   Valuation date: 2026-10-14", 10), ("", 6),
+            ("Golden State Mutual Insurance Co.", 11),
+            (f"Claim Number: {INSURER['claim_number']}   Policy Number: {INSURER['policy_number']}", 10),
+            (f"Insured: {INSURER['policyholder_name']}", 10),
+            ("Loss state: California   Valuation date: 2026-10-14", 10), ("", 6),
             ("Loss Vehicle", 13),
             (f"{v['year']} {v['make']} {v['model']} {v['trim']} 4D Sedan   VIN {v['vin']}", 10),
             (f"Odometer: {v['mileage']:,} mi   Equipment: {', '.join(v['options'])}", 10), ("", 6),
@@ -107,6 +113,7 @@ def main():
 
     claim = {
         "owner_zip": "94704",
+        **INSURER,
         "vehicle": VEHICLE,
         "offer": dict(offer_date="2026-10-14", base_value=BASE, condition_adjustment=-COND, sales_tax=TAX,
                       title_fees=FEES, registration_prorated=None, deductible=DEDUCTIBLE, total=TOTAL,

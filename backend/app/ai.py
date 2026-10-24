@@ -23,9 +23,12 @@ EXTRACT_PROMPT = """This is an insurer's total loss valuation report and offer l
 either as a PDF or as phone photos of the pages (one photo per page; read them even if tilted or shadowed).
 Extract the claim as JSON. Rules:
 - Copy numbers exactly as printed. Do not compute, round or fill in anything that is not printed.
+- Write every date as YYYY-MM-DD, even when the report prints it another way ("October 14, 2026" becomes 2026-10-14).
 - Leave a field null when the report does not state it (for example a missing VIN or seller contact).
 - For vehicle.trim and each comparable's trim, give only the trim level as the manufacturer names it
   (for example "EX", "EX-L", "Sport"), without body style (sedan, coupe, 4D) or drivetrain.
+- Copy insurer_name, claim_number, policy_number and policyholder_name exactly as printed (policyholder_name is
+  the insured's name as it appears on the letter). Null if not printed. Do not extract loss_note; leave it null.
 - Adjustments are signed: amounts that lower the comparable's value are negative.
 - condition.deduction is the positive dollar amount deducted for condition; documented is true only if
   inspection notes or photos support a below-average grade.
@@ -77,10 +80,12 @@ def extract_claim(pdf: bytes) -> Claim:
 class VinPhoto(BaseModel):
     vin: Optional[str] = None
     odometer: Optional[int] = None
+    plate: Optional[str] = None
 
 
 def read_vin(image: bytes, media_type: str) -> VinPhoto:
-    """Read the VIN (and odometer, if visible) from a photo of a VIN plate, door sticker, registration or dashboard."""
+    """Read the VIN (and odometer or license plate, if visible) from a photo of a VIN plate, door sticker,
+    registration, dashboard or license plate."""
     client = anthropic.Anthropic()
     response = client.beta.messages.parse(
         model=MODEL,
@@ -92,8 +97,10 @@ def read_vin(image: bytes, media_type: str) -> VinPhoto:
             "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": media_type,
                                              "data": base64.b64encode(image).decode()}},
-                {"type": "text", "text": "Read the 17-character VIN in this photo exactly as printed, and the odometer "
-                                         "reading in miles if one is visible. Leave a field null if it is not clearly "
+                {"type": "text", "text": "The photo may show a VIN plate, door sticker, registration, dashboard or a "
+                                         "license plate. Read the 17-character VIN exactly as printed, and the odometer "
+                                         "reading in miles if one is visible. If a license plate is visible, read the "
+                                         "plate text exactly as printed. Leave a field null if it is not clearly "
                                          "readable; never guess characters."},
             ],
         }],
@@ -119,6 +126,12 @@ total loss valuation in California. Use only the evidence below.
 - Use only dollar amounts that appear in the evidence, written exactly as given. Never compute new amounts.
 - Quote the rule section for each failed check. Do not give legal conclusions or threaten litigation.
 - Ask for a revised offer of the counteroffer total and a written response.
+- Use the insurer name, claim number and policy number from the evidence in the greeting and a reference line
+  when present.
+- If a policyholder's own account (id note) exists, include ONE sentence summarizing it, citing "note", adding
+  no facts.
+- Sign off with the policyholder name from the evidence when present, otherwise just "Policyholder"
+  (never a bracketed placeholder).
 
 Evidence (id: fact):
 {evidence}"""

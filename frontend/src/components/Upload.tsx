@@ -33,7 +33,11 @@ const COMP: [string, string][] = [
   ["year", "Year"], ["trim", "Trim"], ["vin", "VIN"], ["seller_contact", "Contact"], ["distance_mi", "Miles away"],
   ["listing_date", "Listed"], ["odometer", "Odometer"], ["list_price", "Price"], ["adjusted_value", "Adjusted"],
 ];
-const NUMERIC = new Set(["year", "mileage", "base_value", "condition_adjustment", "sales_tax", "title_fees",
+const DETAILS: [string, string][] = [
+  ["insurer_name", "Insurer"], ["claim_number", "Claim number"], ["policy_number", "Policy number"],
+  ["policyholder_name", "Your name as on the policy"],
+];
+const NUMERIC =new Set(["year", "mileage", "base_value", "condition_adjustment", "sales_tax", "title_fees",
   "registration_prorated", "deductible", "total", "distance_mi", "odometer", "list_price", "adjusted_value"]);
 
 export default function Upload({ onConfirmed }: { onConfirmed: (id: string, claim: Json) => void }) {
@@ -82,6 +86,11 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
 
   function applyVin(d: Json) {
     if (!draft) return;
+    if (!d.vin) {
+      if (!d.plate) throw new Error("We could not read a VIN from that photo.");
+      setVinNote(`Plate seen: ${d.plate}. A plate does not tell us the VIN: type it from your registration or door sticker.`);
+      return;
+    }
     let claim = setIn(draft.claim, ["vehicle", "vin"], d.vin);
     const v = draft.claim.vehicle;
     const filled: string[] = [];
@@ -104,7 +113,8 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
     setVinNote(
       [`VIN ${d.vin}: ${[d.year, d.make, d.model, d.trim].filter(Boolean).join(" ")}`,
         filled.length ? `filled ${filled.join(", ")}` : "",
-        d.odometer != null ? `odometer in photo: ${d.odometer.toLocaleString()} mi` : ""].filter(Boolean).join(" · "),
+        d.odometer != null ? `odometer in photo: ${d.odometer.toLocaleString()} mi` : ""].filter(Boolean).join(" · ")
+        + (d.plate ? `. Plate seen: ${d.plate}.` : ""),
     );
   }
 
@@ -233,7 +243,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
                     {vinBusy ? "Checking…" : "Look up this VIN"}
                   </button>
                   <label className={`${linkCls} focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand`}>
-                    Scan it from a photo
+                    Scan VIN or plate from a photo
                     <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={vinBusy}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
@@ -264,6 +274,42 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
           {labeled("Condition deduction", ["condition", "deduction"], "deduction")}
           {labeled("Condition grade", ["condition", "subject_grade"], "subject_grade")}
         </div>
+      </section>
+
+      <section className="border-t border-line pt-6">
+        <h2 className={sectionH}>Claim details</h2>
+        <p className="mt-2 text-base text-muted">
+          We read these from your report. They go into your letter. Leave any blank if you do not have it.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+          {DETAILS.map(([k, label]) => (
+            <label key={k} className="block text-base font-medium text-ink">
+              <span className="mb-1 block">{label}</span>
+              <input
+                className={inputCls}
+                value={c[k] ?? ""}
+                onChange={(e) => setDraft({ ...draft, claim: { ...c, [k]: e.target.value === "" ? null : e.target.value } })}
+              />
+            </label>
+          ))}
+        </div>
+        <label className="mt-5 block text-base font-medium text-ink">
+          <span className="mb-1 block">What happened? (optional)</span>
+          <textarea
+            className={inputCls}
+            rows={4}
+            maxLength={600}
+            value={c.loss_note ?? ""}
+            aria-describedby="loss-note-hint"
+            onChange={(e) => setDraft({ ...draft, claim: { ...c, loss_note: e.target.value === "" ? null : e.target.value } })}
+          />
+          <span className="mt-1 flex justify-between gap-4 text-base font-normal text-muted">
+            <span id="loss-note-hint">
+              One or two sentences. It goes near the top of your letter. Only write what you would be willing to send to your insurer.
+            </span>
+            <span className="shrink-0">{(c.loss_note ?? "").length}/600</span>
+          </span>
+        </label>
       </section>
 
       <section className="border-t border-line pt-6">

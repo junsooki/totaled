@@ -8,7 +8,7 @@ Rule for the whole system: the AI reads and writes, code computes every dollar, 
 
 | # | Screen | What happens | Code |
 |---|---|---|---|
-| 1 | Upload | Claude reads the report PDF into structured fields; the user confirms each one | `backend/app/ai.py`, `frontend/src/components/Upload.tsx` |
+| 1 | Upload | Claude reads the report PDF into structured fields, including the insurer, claim and policy numbers and the policyholder name for the letter; the user confirms each one and can add an optional note about what happened | `backend/app/ai.py`, `frontend/src/components/Upload.tsx` |
 | 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate), gap in dollars, 35-day deadline | `backend/app/checks.py`, `valuation.py`, `comps.py` |
 | 3 | Counteroffer | Claude drafts the letter; every sentence cites evidence; code rejects any dollar amount not in the evidence; user edits then approves | `backend/app/letter.py`, `ai.py` |
 | 4 | Net payout | CRS credit report finds the auto loan, walk-away amount, negative equity and GAP, prequalification | `backend/app/crs.py` |

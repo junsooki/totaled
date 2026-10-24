@@ -132,7 +132,7 @@ async def scan_vin(photo: UploadFile = File(...)):
         decoded = vin_.decode(read.vin)
     except ValueError as e:
         decoded = {"vin": read.vin, "warning": str(e)}
-    return dict(decoded, odometer=read.odometer)
+    return dict(decoded, odometer=read.odometer, plate=read.plate)
 
 
 @app.put("/api/claims/{cid}/claim")

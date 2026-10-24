@@ -1,7 +1,22 @@
 """The claim as read from the insurer's valuation report and offer letter."""
+from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+DATE_FORMATS = ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%m/%d/%Y", "%m/%d/%y", "%d %B %Y")
+
+
+def to_iso_date(v):
+    """Reports print dates many ways ("October 14, 2026"); the checks need YYYY-MM-DD."""
+    if v is None or v == "":
+        return None
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(str(v).strip(), fmt).date().isoformat()
+        except ValueError:
+            pass
+    raise ValueError(f"date must be YYYY-MM-DD, got {v!r}")
 
 
 class Source(BaseModel):
@@ -26,13 +41,15 @@ class Comparable(BaseModel):
     seller_name: Optional[str] = None
     seller_contact: Optional[str] = None
     distance_mi: Optional[float] = None
-    listing_date: Optional[str] = None  # YYYY-MM-DD
+    listing_date: Optional[str] = Field(None, description="YYYY-MM-DD")
     odometer: Optional[int] = None
     options: List[str] = []
     list_price: float
     adjustments: List[Adjustment] = []
     adjusted_value: Optional[float] = None  # as stated in the report
     source: Optional[Source] = None
+
+    _iso_listing_date = field_validator("listing_date", mode="before")(to_iso_date)
 
 
 class Vehicle(BaseModel):
@@ -53,7 +70,7 @@ class Condition(BaseModel):
 
 
 class Offer(BaseModel):
-    offer_date: str  # YYYY-MM-DD
+    offer_date: str = Field(description="YYYY-MM-DD")
     base_value: float  # as stated in the report
     condition_adjustment: float = 0  # signed
     sales_tax: Optional[float] = None
@@ -64,9 +81,16 @@ class Offer(BaseModel):
     written_explanation: bool = False
     source: Optional[Source] = None
 
+    _iso_offer_date = field_validator("offer_date", mode="before")(to_iso_date)
+
 
 class Claim(BaseModel):
     owner_zip: str
+    insurer_name: Optional[str] = None  # copied from the report
+    claim_number: Optional[str] = None  # copied from the report
+    policy_number: Optional[str] = None  # copied from the report
+    policyholder_name: Optional[str] = None  # the insured, as printed on the report
+    loss_note: Optional[str] = None  # the policyholder's own account; typed by the user, never read from the report
     vehicle: Vehicle
     offer: Offer
     condition: Condition

@@ -1,5 +1,9 @@
 {
   "owner_zip": "94704",
+  "insurer_name": "Golden State Mutual Insurance Co.",
+  "claim_number": "CLM-2026-48213",
+  "policy_number": "CA-AUTO-7731904",
+  "policyholder_name": "Jordan Rivera",
   "vehicle": {
     "year": 2019,
     "make": "Honda",
