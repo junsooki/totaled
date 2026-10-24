@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Json, post } from "@/lib/api";
-import { Badge, Button, inputCls } from "./ui";
+import { Badge, Button } from "./ui";
 
 export default function Letter({ id, letter, onApproved }: { id: string; letter: Json; onApproved: () => void }) {
   const original: Json[] = letter.sentences;
@@ -11,6 +11,7 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
   const evidence = new Map<string, string>(letter.evidence.map((e: Json) => [e.id, e.fact]));
 
   async function approve() {
@@ -34,40 +35,92 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
 
   const rejected = checked.filter((s) => !s.ok).length;
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-zinc-500">
-        Drafted by <Badge>{letter.drafted_by}</Badge>. Every sentence cites a check or listing; code rejects any dollar
-        amount that is not in the evidence. Edit freely, then approve. Nothing is sent until you approve.
+    <div className="space-y-6">
+      <p className="max-w-prose text-base text-muted">
+        Read the letter and change any sentence. The small numbers show the evidence behind each sentence. Nothing is
+        sent until you approve.
       </p>
-      {rejected > 0 && <p className="text-sm text-red-600">{rejected} sentence(s) fail the citation check.</p>}
-      <ol className="space-y-3">
-        {texts.map((t, i) => {
-          const s = checked[i];
-          const edited = t !== original[i].text;
-          return (
-            <li key={i} className={`rounded border p-2 ${s && !s.ok ? "border-red-400" : "border-zinc-200 dark:border-zinc-800"}`}>
-              <textarea className={`${inputCls} min-h-[2.5rem]`} rows={Math.ceil(t.length / 110)} value={t} disabled={approved}
-                onChange={(e) => setTexts(texts.map((x, j) => (j === i ? e.target.value : x)))} />
-              {edited && <p className="mt-1 text-xs text-zinc-500 line-through">{original[i].text}</p>}
-              <div className="mt-1 flex flex-wrap gap-1">
-                {original[i].citations.map((c: string) => (
-                  <span key={c} title={evidence.get(c) ?? ""}><Badge>{c}</Badge></span>
-                ))}
-                {s && !s.ok && s.problems.map((p: string) => <Badge key={p} tone="red">{p}</Badge>)}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {approved ? (
-        <div className="flex items-center gap-3">
-          <Badge tone="green">Approved</Badge>
-          <Button variant="secondary" onClick={() => navigator.clipboard.writeText(texts.join("\n\n"))}>Copy letter</Button>
-        </div>
-      ) : (
-        <Button onClick={approve} disabled={busy}>{busy ? "Checking…" : "Approve letter"}</Button>
-      )}
+
+      <div className="mx-auto max-w-2xl rounded-2xl bg-cream px-6 py-8 shadow-sm ring-1 ring-line sm:px-12 sm:py-12">
+        <ol className="space-y-5 font-serif text-lg leading-8 text-ink">
+          {texts.map((t, i) => {
+            const s = checked[i];
+            const failed = s && !s.ok;
+            const edited = t !== original[i].text;
+            return (
+              <li key={i} className={failed ? "rounded-lg bg-alert-soft p-3" : ""}>
+                <textarea
+                  aria-label={`Sentence ${i + 1}`}
+                  className={`block w-full resize-none rounded-md bg-transparent px-1 py-0.5 font-serif text-lg leading-8 hover:bg-surface focus-visible:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:hover:bg-transparent ${failed ? "text-alert" : "text-ink"}`}
+                  rows={Math.max(1, Math.ceil(t.length / 62))}
+                  value={t}
+                  disabled={approved}
+                  onChange={(e) => setTexts(texts.map((x, j) => (j === i ? e.target.value : x)))}
+                />
+                {edited && <p className="mt-1 px-1 font-sans text-sm text-muted line-through">{original[i].text}</p>}
+                {original[i].citations.length > 0 && (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 px-1 font-sans text-sm text-muted">
+                    <span>Evidence:</span>
+                    {original[i].citations.map((c: string) => {
+                      const key = `${i}:${c}`;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-expanded={open === key}
+                          title={evidence.get(c) ?? ""}
+                          onClick={() => setOpen(open === key ? null : key)}
+                          className="cursor-pointer rounded px-1 text-brand underline decoration-dotted underline-offset-2 hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        >
+                          {c}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {original[i].citations.map((c: string) =>
+                  open === `${i}:${c}` ? (
+                    <p key={c} className="mt-1 rounded-md bg-brand-soft px-3 py-2 font-sans text-sm leading-6 text-ink">
+                      <span className="font-semibold">{c}:</span> {evidence.get(c) ?? "No detail available."}
+                    </p>
+                  ) : null,
+                )}
+                {failed && (
+                  <ul className="mt-2 px-1 font-sans text-sm font-medium text-alert">
+                    {s.problems.map((p: string) => <li key={p}>{p}</li>)}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      <div className="mx-auto max-w-2xl space-y-4">
+        {rejected > 0 && (
+          <p className="text-base font-medium text-alert">
+            {rejected} {rejected === 1 ? "sentence does" : "sentences do"} not pass the check. Each dollar amount must
+            match the evidence. Fix {rejected === 1 ? "it" : "them"} and approve again.
+          </p>
+        )}
+        {error && <p role="alert" className="text-base text-alert">{error}</p>}
+        {approved ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge tone="green">Approved</Badge>
+            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(texts.join("\n\n"))}>Copy letter</Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Button onClick={approve} disabled={busy}>{busy ? "Checking…" : "Approve this letter"}</Button>
+            <p className="text-base text-muted">
+              We check every dollar amount against the evidence, then save the letter so you can copy it.
+            </p>
+          </div>
+        )}
+        <p className="text-sm text-muted">
+          Drafted by {letter.drafted_by === "claude" ? "Claude" : letter.drafted_by}.
+        </p>
+      </div>
     </div>
   );
 }

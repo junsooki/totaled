@@ -12,9 +12,9 @@ Rule for the whole system: the AI reads and writes, code computes every dollar, 
 | 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate), gap in dollars, 35-day deadline | `backend/app/checks.py`, `valuation.py`, `comps.py` |
 | 3 | Counteroffer | Claude drafts the letter; every sentence cites evidence; code rejects any dollar amount not in the evidence; user edits then approves | `backend/app/letter.py`, `ai.py` |
 | 4 | Net payout | CRS credit report finds the auto loan, walk-away amount, negative equity and GAP, prequalification | `backend/app/crs.py` |
-| 5 | Replace | Ranked replacement cars in budget, CRS seller check (identity + liens), simulated Visa deposit under a spending cap with consent and an explained receipt | `backend/app/main.py`, `Replace.tsx` |
+| 5 | Rental and next car | 5a: demo rental options and a simulated Visa rental hold. 5b: ranked replacement cars in budget, CRS seller check (identity + liens), simulated Visa deposit. Both holds share one spending cap, with consent and an explained receipt | `backend/app/main.py`, `Rental.tsx`, `Replace.tsx` |
 
-The results card shows dollars at stake, checks failed and minutes from upload to approved letter, with an audit trail.
+The results card shows dollars at stake, checks failed (distinct checks, not rows) and minutes from upload to approved letter, with an audit trail.
 
 ## Live vs demo
 
@@ -23,7 +23,7 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 - Apify: `e-commerce/cargurus-zipcode-search-scraper`; each search is saved in the database and reused for `MARKET_CACHE_HOURS` (24 on prod), capped at $0.50 per run.
 - CRS: sandbox REST API, test personas only (`backend/app/fixtures/crs_personas.json`), never real credit data.
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
-- Visa: simulated checkout, labeled as such.
+- Visa: simulated checkout, labeled as such. Covers the rental hold and the car deposit; one spending cap applies to both.
 
 ## Live tracker (SpacetimeDB)
 
