@@ -9,6 +9,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import live
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", Path(__file__).resolve().parent.parent / "data" / "totaled.db"))
 
@@ -72,6 +74,8 @@ def log(cid: str, kind: str, detail: dict):
     conn.execute(f"INSERT INTO events (claim_id, at, kind, detail) VALUES ({p}, {p}, {p}, {p})",
                  (cid, now(), kind, json.dumps(detail)))
     conn.close()
+    if live.enabled() and kind != "created":  # "created" comes before the claim fields exist
+        live.report(cid, kind, detail, get(cid))
 
 
 def events(cid: str) -> list:
