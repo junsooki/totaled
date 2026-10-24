@@ -18,7 +18,8 @@ def available() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 
-EXTRACT_PROMPT = """This is an insurer's total loss valuation report and offer letter for a car in California.
+EXTRACT_PROMPT = """This is an insurer's total loss valuation report and offer letter for a car in California,
+either as a PDF or as phone photos of the pages (one photo per page; read them even if tilted or shadowed).
 Extract the claim into the schema. Rules:
 - Copy numbers exactly as printed. Do not compute, round or fill in anything that is not printed.
 - Leave a field null when the report does not state it (for example a missing VIN or seller contact).

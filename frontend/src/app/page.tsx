@@ -61,7 +61,8 @@ export default function Home() {
         {claim ? (
           <p className="text-sm">
             {claim.vehicle.year} {claim.vehicle.make} {claim.vehicle.model} {claim.vehicle.trim} · offer {usd(claim.offer.total, true)} ·{" "}
-            {claim.comparables.length} comparables <Badge tone="green">confirmed</Badge>
+            {claim.comparables.length} comparables <Badge tone="green">confirmed</Badge>{" "}
+            <a className="underline" href={`/track?id=${id}`} target="_blank" rel="noreferrer">Open live tracker</a>
           </p>
         ) : (
           <Upload onConfirmed={(cid, c) => { setId(cid); setClaim(c); refreshResults(cid); }} />

@@ -33,12 +33,12 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ id: string; claim: Json; by: string } | null>(null);
 
-  async function start(file?: File) {
+  async function start(files?: FileList | null) {
     setBusy(true);
     setError(null);
     try {
       const form = new FormData();
-      if (file) form.append("file", file);
+      for (const f of Array.from(files ?? [])) form.append("files", f);
       const res = await fetch(`${API}/api/claims`, { method: "POST", body: form });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? res.statusText);
@@ -83,12 +83,19 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   if (!draft) {
     return (
       <div className="rounded border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">Drop in the insurer&apos;s valuation report and offer letter (one PDF).</p>
+        <p className="text-sm text-zinc-500">
+          Add the insurer&apos;s valuation report and offer letter: one PDF, or a photo of each page. We fill in the fields for you.
+        </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
           <label className="cursor-pointer rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-zinc-900">
-            {busy ? "Reading report…" : "Upload PDF"}
-            <input type="file" accept="application/pdf" className="hidden" disabled={busy}
-              onChange={(e) => e.target.files?.[0] && start(e.target.files[0])} />
+            {busy ? "Reading report…" : "Take photos"}
+            <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={busy}
+              onChange={(e) => e.target.files?.length && start(e.target.files)} />
+          </label>
+          <label className="cursor-pointer rounded border border-zinc-300 px-4 py-2 text-sm font-medium dark:border-zinc-700">
+            Upload PDF or photos
+            <input type="file" accept="application/pdf,image/*" multiple className="hidden" disabled={busy}
+              onChange={(e) => e.target.files?.length && start(e.target.files)} />
           </label>
           <Button variant="secondary" disabled={busy} onClick={() => start()}>Use the sample report</Button>
         </div>

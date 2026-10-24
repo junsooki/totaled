@@ -55,11 +55,28 @@ def status():
 
 # --- 1. Upload ---------------------------------------------------------------
 
+def _photos_to_pdf(photos: List[bytes]) -> bytes:
+    """One PDF page per photo, so photos flow through the same reader and page viewer as a PDF."""
+    doc = fitz.open()
+    for img in photos:
+        try:
+            src = fitz.open(stream=img)
+        except Exception:
+            raise HTTPException(415, "Unsupported image. Use JPEG or PNG (iPhone uploads convert HEIC to JPEG).")
+        rect = src[0].rect
+        doc.new_page(width=rect.width, height=rect.height).insert_image(rect, stream=img)
+    return doc.tobytes()
+
+
 @app.post("/api/claims")
-async def create_claim(file: Optional[UploadFile] = File(None)):
-    """Upload the valuation report PDF, or send no file to load the sample report."""
-    if file is not None:
-        pdf, sample = await file.read(), False
+async def create_claim(files: Optional[List[UploadFile]] = File(None)):
+    """Upload the valuation report as a PDF or as photos of its pages; send nothing to load the sample report."""
+    if files:
+        blobs = [await f.read() for f in files]
+        pdfs = [b for b, f in zip(blobs, files) if f.content_type == "application/pdf"]
+        if pdfs and len(files) > 1:
+            raise HTTPException(400, "Upload one PDF, or photos of the pages, not both")
+        pdf, sample = (pdfs[0] if pdfs else _photos_to_pdf(blobs)), False
     else:
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
 
@@ -71,7 +88,7 @@ async def create_claim(file: Optional[UploadFile] = File(None)):
     elif sample:
         claim, by = json.loads((FIXTURES / "sample_claim.json").read_text()), "sample fixture (Claude not configured)"
     else:
-        raise HTTPException(503, "Reading a PDF needs ANTHROPIC_API_KEY. Load the sample report or add the key.")
+        raise HTTPException(503, "Reading a report or photos needs ANTHROPIC_API_KEY. Load the sample report or add the key.")
 
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
                      "extracted_by": by, "created_at": db.now()})
