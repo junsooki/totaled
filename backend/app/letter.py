@@ -1,7 +1,7 @@
 """Evidence for the counteroffer letter, and a template draft used when Claude is not configured."""
 from typing import List
 
-from .ai import Letter, Sentence
+from .ai import DOLLARS, Letter, Sentence
 from .checks import CHECKS
 from .schemas import Claim
 
@@ -13,6 +13,10 @@ def _usd(x: float) -> str:
     return f"${x:,.2f}"
 
 
+def _note(claim: Claim) -> str:
+    return (claim.loss_note or "").strip()[:600].strip()
+
+
 def build_evidence(claim: Claim, audit: dict) -> List[dict]:
     v, o = claim.vehicle, claim.offer
     ev = [{
@@ -21,6 +25,15 @@ def build_evidence(claim: Claim, audit: dict) -> List[dict]:
                 f"insurer's offer dated {o.offer_date} totals {_usd(o.total)} with base value {_usd(o.base_value)}",
         "amounts": [o.total, o.base_value],
     }]
+    known = [f"{label} {val}" for label, val in (
+        ("insurer", claim.insurer_name), ("claim number", claim.claim_number),
+        ("policy number", claim.policy_number), ("policyholder name", claim.policyholder_name)) if val]
+    if known:
+        ev[0]["fact"] += "; " + ", ".join(known)
+    note = _note(claim)
+    if note:
+        ev.append({"id": "note", "fact": f"Policyholder's own account: {note}",
+                   "amounts": [float(m.replace(",", "")) for m in DOLLARS.findall(note)]})
     comps = {c.id: c for c in claim.comparables}
     for r in audit["checks"]:
         if r["status"] != "fail":
@@ -65,9 +78,18 @@ def build_evidence(claim: Claim, audit: dict) -> List[dict]:
 
 def template_letter(claim: Claim, evidence: List[dict]) -> Letter:
     v, o = claim.vehicle, claim.offer
-    s = [Sentence(text="To the claims adjuster,", citations=["claim"]),
-         Sentence(text=f"I am responding to your total loss offer dated {o.offer_date} of {_usd(o.total)} for my "
-                       f"{v.year} {v.make} {v.model} {v.trim or ''}.", citations=["claim"])]
+    greeting = f"To {claim.insurer_name} claims department," if claim.insurer_name else "To the claims adjuster,"
+    s = [Sentence(text=greeting, citations=["claim"])]
+    refs = [f"claim number {claim.claim_number}" if claim.claim_number else "",
+            f"policy number {claim.policy_number}" if claim.policy_number else ""]
+    refs = [r for r in refs if r]
+    if refs:
+        s.append(Sentence(text=f"Re: {', '.join(refs)}.", citations=["claim"]))
+    s.append(Sentence(text=f"I am responding to your total loss offer dated {o.offer_date} of {_usd(o.total)} for my "
+                           f"{v.year} {v.make} {v.model} {v.trim or ''}.", citations=["claim"]))
+    note = _note(claim)
+    if note:
+        s.append(Sentence(text=f"In my own words: {note}", citations=["note"]))
     for e in evidence:
         if e["id"].startswith("check:"):
             s.append(Sentence(text=e["fact"].replace("Fails", "The valuation fails") + ".", citations=[e["id"]]))
@@ -80,4 +102,6 @@ def template_letter(claim: Claim, evidence: List[dict]) -> Letter:
     s.append(Sentence(text="Please respond in writing with a revised offer or an explanation of each item above.",
                       citations=["claim"]))
     s.append(Sentence(text="Sincerely,", citations=["claim"]))
+    if claim.policyholder_name:
+        s.append(Sentence(text=claim.policyholder_name, citations=["claim"]))
     return Letter(sentences=s)

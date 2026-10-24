@@ -36,7 +36,12 @@ function EntrySkeleton() {
   );
 }
 
-const verdictLabel = (v: string) => (v.startsWith("OK") ? "OK" : v.startsWith("STOP") ? "STOP" : "CAUTION");
+// Demo assignment of CRS sandbox test profiles, by car position in the shortlist (cycles).
+// Expected verdicts: OK, OK, CAUTION, OK, OK, CAUTION, OK, STOP.
+const SELLER_PROFILES = ["P01", "P02", "P08", "P03", "P05", "P11", "P04", "P12"];
+const titleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+const verdictLabel =(v: string) => (v.startsWith("OK") ? "OK" : v.startsWith("STOP") ? "STOP" : "CAUTION");
 
 export default function Replace({ id, personas, cap, setCap, onPurchased }: {
   id: string; personas: Json[]; cap: string; setCap: (v: string) => void; onPurchased: () => void;
@@ -45,7 +50,6 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [checks, setChecks] = useState<Record<string, Json>>({});
-  const [sellerPersona, setSellerPersona] = useState("P08");
   const [hold, setHold] = useState<Json | null>(null);
   const [deposit, setDeposit] = useState("500");
   const [consentKey, setConsentKey] = useState<string | null>(null);
@@ -71,11 +75,11 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
   const inputsOk = depositOk && capOk;
   const consent = consentKey === `${deposit}|${cap}`;
 
-  async function checkSeller(vin: string) {
+  async function checkSeller(vin: string, persona: string) {
     setBusy(vin);
     setError(null);
     try {
-      const r = await post(`/api/claims/${id}/seller-check`, { vin, persona: sellerPersona });
+      const r = await post(`/api/claims/${id}/seller-check`, { vin, persona });
       setChecks((prev) => ({ ...prev, [vin]: r }));
     } catch (e) {
       setError(errMsg(e));
@@ -158,17 +162,13 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
       <div>
         <h2 className="font-serif text-2xl font-semibold text-ink">Or pick from today&apos;s listings</h2>
 
-        <div className="mt-4">
-          <label htmlFor="seller-persona" className="block text-base font-medium text-ink">Check sellers as</label>
-          <select id="seller-persona" className={`${inputCls} mt-1 !w-auto max-w-full`} value={sellerPersona} onChange={(e) => setSellerPersona(e.target.value)}>
-            {personas.map((p) => <option key={p.id} value={p.id}>{p.id} {p.name} ({p.profile})</option>)}
-          </select>
-          <p className="mt-1 text-base text-muted">Demo identity for the CRS sandbox.</p>
-        </div>
+        <p className="mt-2 text-base text-muted">Seller checks run on CRS sandbox test profiles, one per car, not on the real dealers.</p>
 
         <div className="mt-8 grid gap-x-8 gap-y-8 sm:grid-cols-2">
-          {data.shortlist.map((l: Json) => {
+          {data.shortlist.map((l: Json, i: number) => {
             const chk = checks[l.vin];
+            const personaId = SELLER_PROFILES[i % SELLER_PROFILES.length];
+            const persona = personas.find((p) => p.id === personaId);
             const label = chk ? verdictLabel(chk.verdict) : null;
             const stop = label === "STOP";
             const title = `${l.year} ${l.make} ${l.model} ${l.trim ?? ""}`.trim();
@@ -200,10 +200,15 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
                       </span>
                     </div>
                     <p className="mt-1 text-base text-muted">Identity: {chk.identity_detail}. Records: {chk.records_detail}. ({chk.source})</p>
+                    {chk.persona && (
+                      <p className="mt-1 text-base text-muted">
+                        Checked against test profile {persona ? titleCase(persona.name) : personaId} ({persona ? persona.profile : personaId}). Demo: the CRS sandbox has no real dealers.
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Button variant="secondary" onClick={() => checkSeller(l.vin)} disabled={!!busy}>
+                  <Button variant="secondary" onClick={() => checkSeller(l.vin, personaId)} disabled={!!busy}>
                     {busy === l.vin ? "Checking…" : chk ? "Check again" : "Check seller"}
                   </Button>
                   <Button onClick={() => { setHold(l); setConsentKey(null); }} disabled={!chk || stop}>
