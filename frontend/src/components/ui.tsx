@@ -206,13 +206,33 @@ export function SummaryList({ rows }: { rows: SummaryRow[] }) {
  * it is sticky (give its wrapper `lg:order-2`).
  */
 export function SummaryPanel({ title = "Your case", rows, children }: { title?: string; rows: SummaryRow[]; children?: ReactNode }) {
+  const key = rows.find((r) => r.big) ?? rows[0];
   return (
-    <aside aria-label={title} className="border-t-4 border-brand pt-3 lg:sticky lg:top-6">
-      <h2 className="text-2xl">{title}</h2>
-      <div className="mt-2">
-        <SummaryList rows={rows} />
-      </div>
-      {children}
-    </aside>
+    <div>
+      {/* Below lg: collapsed disclosure. The sticky panel below is display:none here. */}
+      <details className="group border-t-4 border-brand lg:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 py-2 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
+          <span className="font-serif text-xl font-semibold text-ink">{title}</span>
+          <span className="min-w-0 flex-1 truncate text-lg font-medium text-ink">
+            {key ? (key.big ? <>{key.label}: {key.value}</> : key.value) : null}
+          </span>
+          <span className="shrink-0 text-base font-medium text-brand underline">
+            <span className="group-open:hidden">Show</span>
+            <span className="hidden group-open:inline">Hide</span>
+          </span>
+        </summary>
+        <div className="border-t border-rule pt-2">
+          <SummaryList rows={rows} />
+          {children}
+        </div>
+      </details>
+      <aside aria-label={title} className="hidden border-t-4 border-brand pt-3 lg:sticky lg:top-6 lg:block">
+        <h2 className="text-2xl">{title}</h2>
+        <div className="mt-2">
+          <SummaryList rows={rows} />
+        </div>
+        {children}
+      </aside>
+    </div>
   );
 }
