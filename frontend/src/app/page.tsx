@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AgentWork from "@/components/AgentWork";
+import AskBar from "@/components/AskBar";
 import Audit from "@/components/Audit";
+import Hero from "@/components/Hero";
 import IfNo from "@/components/IfNo";
 import Letter from "@/components/Letter";
 import Payout from "@/components/Payout";
 import Replace from "@/components/Replace";
+import { CountUp } from "@/components/motion";
 import Upload from "@/components/Upload";
 import { Button, Stat, StepCard, Stepper, SummaryPanel, type SummaryRow } from "@/components/ui";
 import { call, Json, post, usd } from "@/lib/api";
@@ -30,6 +34,14 @@ export default function Home() {
   // Steps the user has opened. Letter, Payout and Next car stay mounted once opened so Back keeps their data.
   const [seen, setSeen] = useState<Record<number, boolean>>({});
   const auditStarted = useRef(false);
+  // The header goes dark while it sits over the dark hero, like Cruma's.
+  const [overHero, setOverHero] = useState(true);
+  useEffect(() => {
+    const onScroll = () => setOverHero(window.scrollY < window.innerHeight * 0.75);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const prevCur = useRef(0);
 
   const show = (i: number) => {
@@ -127,28 +139,30 @@ export default function Home() {
     : [];
 
   const showPanel = !!claim && cur > 0;
+  const hero = cur === 0 && !claim;
+  const darkHeader = hero && overHero;
   const personas = status?.personas ?? [];
 
   return (
     <>
-    <header className="sticky top-0 z-20 border-b border-line bg-white/80 backdrop-blur-md">
+    <header className={`fixed inset-x-0 top-0 z-20 border-b backdrop-blur-md transition-colors duration-300 ${darkHeader ? "border-white/10 bg-[#070f29]/40" : "border-line bg-white/80"}`}>
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <span className="flex items-center gap-2 text-2xl font-medium tracking-tight text-ink">
-          <svg viewBox="0 0 24 24" className="size-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+        <span className={`flex items-center gap-2 text-2xl font-medium tracking-tight ${darkHeader ? "text-white" : "text-ink"}`}>
+          <svg viewBox="0 0 24 24" className={`size-6 ${darkHeader ? "text-white" : "text-brand"}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
             <path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6l3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5" />
           </svg>
           Totaled
         </span>
-        <span className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white">California · not legal advice</span>
+        <span className={`rounded-full px-4 py-2 text-sm font-medium ${darkHeader ? "bg-white text-ink" : "bg-ink text-white"}`}>California · not legal advice</span>
       </div>
     </header>
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6 sm:py-12">
-      {cur === 0 && (
-        <div className="mb-4 max-w-3xl">
-          <p className="text-base font-semibold text-brand">After the accident</p>
-          <p className="mt-2 text-4xl font-light leading-tight tracking-[-0.03em] sm:text-6xl">
-            <span className="text-muted/50">Insurers use software to value your car.</span>{" "}
-            <span className="text-ink">Now you can check theirs.</span>
+    {hero && <Hero onStart={() => document.getElementById("start")?.scrollIntoView({ behavior: "smooth" })} />}
+    <div id="start" className={`mx-auto flex w-full max-w-6xl flex-1 scroll-mt-16 flex-col px-4 sm:px-6 ${hero ? "py-12" : "pt-24 pb-12"} ${audit ? "pb-48" : ""}`}>
+      {hero && (
+        <div className="mb-2">
+          <p className="text-base font-semibold text-brand">Step by step</p>
+          <p className="mt-1 text-4xl font-light tracking-[-0.03em] text-ink sm:text-5xl">
+            <span className="text-muted/50">Start with</span> the insurer&apos;s report.
           </p>
         </div>
       )}
@@ -182,11 +196,14 @@ export default function Home() {
               footer={claim ? nav("Continue to audit") : undefined}
             >
               {claim ? (
-                <div>
+                <div className="space-y-6">
+                  {id && <AgentWork id={id} agent="Reader" active={false} defaultOpen={false} />}
+                  <div>
                   <p className="font-serif text-2xl font-semibold text-ink">{v.year} {v.make} {v.model} {v.trim}</p>
                   <p className="mt-2 text-lg text-muted">
                     Offer of {usd(claim.offer.total, true)} with {claim.comparables.length} comparable cars. Your claim is confirmed.
                   </p>
+                  </div>
                 </div>
               ) : (
                 <Upload
@@ -207,6 +224,7 @@ export default function Home() {
               subtitle="We test the insurer's numbers and compare them with cars for sale near you."
               footer={nav("Continue to counteroffer")}
             >
+              <div className="mb-8"><AgentWork id={id} agent="Appraiser" active={busy === "audit"} defaultOpen={false} /></div>
               {audit ? (
                 <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} />
               ) : auditError ? (
@@ -216,9 +234,7 @@ export default function Home() {
                     <Button disabled={busy === "audit"} onClick={runAudit}>Try again</Button>
                   </div>
                 </div>
-              ) : (
-                <p role="status" className="text-lg text-muted">Running checks and pulling live listings. This can take a moment.</p>
-              )}
+              ) : null}
             </StepCard>
           )}
 
@@ -229,6 +245,7 @@ export default function Home() {
                 subtitle="We write a letter that asks the insurer for a fair value. Read it, then approve it."
                 footer={nav("Continue to net payout")}
               >
+                <div className="mb-8"><AgentWork id={id} agent="Negotiator" active={busy === "letter"} defaultOpen={!letter} /></div>
                 {letter ? (
                   <div className="space-y-10">
                     <Letter key={`letter-${id}`} id={id} letter={letter} onApproved={() => { setApproved(true); refreshResults(); }} />
@@ -278,7 +295,7 @@ export default function Home() {
               {results && results.checks_failed != null ? (
                 <>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Stat label="Dollars at stake" value={usd(results.dollars_at_stake)} tone="text-brand" />
+                    <Stat label="Dollars at stake" value={results.dollars_at_stake != null ? <CountUp value={results.dollars_at_stake} format={(n) => usd(n)} /> : "—"} tone="text-brand" />
                     <Stat label="Checks failed" value={results.checks_failed} />
                     <Stat label="Upload to approved letter" value={results.minutes_to_letter != null ? `${results.minutes_to_letter} min` : "—"} />
                     <Stat label="Replacement held" value={results.purchase ? usd(results.purchase.total) : "—"} />
@@ -311,6 +328,7 @@ export default function Home() {
         <p className="mt-1">California only · not legal advice</p>
       </footer>
     </div>
+    {id && audit && <AskBar id={id} />}
     </>
   );
 }

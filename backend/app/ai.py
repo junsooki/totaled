@@ -160,3 +160,36 @@ def citation_check(letter: Letter, evidence: List[dict]) -> List[dict]:
                 problems.append(f"${m} is not in the evidence")
         out.append({"text": s.text, "citations": s.citations, "ok": not problems, "problems": problems})
     return out
+
+
+class Answer(BaseModel):
+    found: bool  # false when the sources do not answer the question
+    sentences: List[Sentence]
+
+
+ASK_PROMPT = """Answer the owner's question about their total loss claim using only the sources below.
+- Every sentence must cite at least one source id in its citations list.
+- Use only dollar amounts that appear in the sources, written exactly as given. Never compute new amounts.
+- If the sources do not answer the question, set found to false and return no sentences.
+- Plain words, at most 4 sentences. Do not give legal advice, rate the case or predict an outcome.
+
+Sources (id: fact):
+{sources}
+
+Question: {question}"""
+
+
+def answer_question(question: str, sources: List[dict]) -> Answer:
+    client = anthropic.Anthropic()
+    lines = "\n".join(f"{s['id']}: {s['fact']}" for s in sources)
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=4000,
+        output_config={"effort": "low"},
+        output_format=Answer,
+        messages=[{"role": "user", "content": ASK_PROMPT.format(sources=lines, question=question)}],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not answer (stop_reason={response.stop_reason})")
+    return response.parsed_output

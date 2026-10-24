@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Json, post, usd } from "@/lib/api";
-import { Badge, Button, inputCls } from "./ui";
+import AgentWork from "./AgentWork";
+import { CountUp, Reveal } from "./motion";
+import { Badge, Button, inputCls, OkCard } from "./ui";
 
 /** Plain-language message from a thrown error, including FastAPI 422 `detail` arrays. */
 function errMsg(e: unknown): string {
@@ -112,8 +114,8 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
       );
     }
     return (
-      <div role="status" aria-label="Searching listings">
-        <p className="mb-3 text-base text-muted">Searching listings near you…</p>
+      <div role="status" aria-label="Searching listings" className="space-y-4">
+        <AgentWork key="searching" id={id} agent="Shopper" active />
         <div className="grid gap-4 sm:grid-cols-2"><CardSkeleton /><CardSkeleton /></div>
       </div>
     );
@@ -121,13 +123,15 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
 
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl bg-brand-soft p-5">
-        <div className="flex flex-wrap items-center gap-2 text-base text-muted">
+      <AgentWork key="shopping" id={id} agent="Shopper" active={!!busy && busy !== "mandate" && busy !== "pay"} defaultOpen={false} />
+      <div className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(150deg,#0b1f4d,#132c8f_55%,#1633c9)] p-6 text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-20 -bottom-24 size-72 rounded-full bg-[radial-gradient(closest-side,rgba(255,163,107,0.5),transparent)]" />
+        <div className="relative flex flex-wrap items-center gap-2 text-base text-white/70">
           Your buying power
           <Badge tone={data.source === "demo" ? "amber" : "green"}>{data.source}</Badge>
         </div>
-        <div className="font-serif text-4xl font-semibold tracking-tight text-ink">{usd(data.budget)}</div>
-        <p className="mt-1 text-base text-ink">
+        <div className="relative text-5xl font-light tracking-[-0.03em] sm:text-6xl"><CountUp value={data.budget} format={(n) => usd(n)} /></div>
+        <p className="relative mt-2 max-w-prose text-base text-white/85">
           {usd(data.walk_away)} in cash you walk away with
           {data.financing?.max_amount ? `, plus up to ${usd(data.financing.max_amount)} in prequalified financing` : ""}.
           The same listings that show the insurer underpaid you are now your shopping list.
@@ -193,14 +197,12 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
         {data.shortlist.length === 0 && <p className="text-base text-muted">No cars fit your budget right now.</p>}
       </section>
 
-      <section className="rounded-2xl ring-1 ring-line">
-        <div className="border-b border-line p-5">
-          <h3 className="font-serif text-xl font-semibold text-ink">2. Set the agent&apos;s mandate</h3>
-          <p className="mt-1 max-w-prose text-base text-muted">
-            Before anything is spent, you decide the limits. The checkout refuses anything outside them.
-          </p>
-        </div>
-        <div className="grid gap-5 p-5 sm:grid-cols-2">
+      <Reveal>
+      <OkCard title="2. Set the agent's mandate" done={!!mandate && !stale}>
+        <p className="max-w-prose text-base text-muted">
+          Before anything is spent, you decide the limits. The checkout refuses anything outside them.
+        </p>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <dl className="space-y-3">
             <div><dt className="text-sm text-muted">Budget for the car</dt><dd className="text-lg font-semibold text-ink">{usd(data.budget)}</dd></div>
             <div>
@@ -230,19 +232,19 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
             </ul>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t border-line p-5">
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-5">
           <Button onClick={grant} disabled={!capOk || !passed.length || busy === "mandate" || (!!mandate && !stale && Number(mandate.spending_cap) === capNum)}>
             {busy === "mandate" ? "Granting…" : mandate ? "Update mandate" : "Grant this mandate"}
           </Button>
           {mandate && !stale && <Badge tone="green">Granted {mandate.id}</Badge>}
           {stale && <span className="text-sm text-amber">A new seller passed. Update the mandate to include them.</span>}
         </div>
-      </section>
+      </OkCard>
+      </Reveal>
 
       {hold && mandate && (
-        <section className="rounded-2xl bg-brand-soft p-6">
-          <h3 className="font-serif text-2xl font-semibold text-ink">3. Approve this charge</h3>
-          <p className="mt-2 max-w-prose text-base text-ink">
+        <OkCard title="3. Approve this charge">
+          <p className="max-w-prose text-base text-ink">
             A refundable deposit on the {carName(hold)} ({usd(hold.price)}) from {hold.seller_name}.
             It holds the car for 48 hours, counts toward the price if you buy, and is refunded if you do not.
           </p>
@@ -272,7 +274,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
             <Button onClick={pay} disabled={!consent || !depositOk || busy === "pay"}>{busy === "pay" ? "Placing hold…" : "Place deposit"}</Button>
             <Button variant="secondary" onClick={() => setHold(null)}>Cancel</Button>
           </div>
-        </section>
+        </OkCard>
       )}
       {error && <p role="alert" className="rounded-xl bg-alert-soft px-4 py-3 text-base text-alert">{error}</p>}
 

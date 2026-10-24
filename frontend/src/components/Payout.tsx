@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Json, post, usd } from "@/lib/api";
+import AgentWork from "./AgentWork";
+import { CountUp } from "./motion";
 import { Badge, Button, inputCls } from "./ui";
 
 /** Monthly payment on an amortized loan. */
@@ -69,6 +71,8 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
         {error && <p className="mt-3 text-base text-alert">{error}</p>}
       </div>
 
+      {(busy || result) && <AgentWork id={id} agent="Banker" active={busy} defaultOpen={false} />}
+
       {result && np && (
         <div className="space-y-6">
           <div className="overflow-x-auto rounded-2xl ring-1 ring-line">
@@ -85,7 +89,7 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
                 {([
                   ["Insurance payout", (x: Json) => usd(x.payout)],
                   ["You still owe on the loan", (x: Json) => (x.loan_balance ? `− ${usd(x.loan_balance)}` : usd(0))],
-                  ["You walk away with", (x: Json) => <span className={`font-serif text-3xl font-semibold tracking-tight ${walkTone(x)}`}>{usd(x.walk_away)}</span>],
+                  ["You walk away with", (x: Json) => <span className={`font-serif text-3xl font-semibold tracking-tight ${walkTone(x)}`}><CountUp value={x.walk_away} format={(n) => usd(n)} /></span>],
                   ["Negative equity", (x: Json) => (x.negative_equity ? (x.gap_covers_shortfall ? "Yes, GAP should cover it" : "Yes, you pay the difference") : "No")],
                   ["Buying power for your next car", (x: Json) => usd(Math.max(x.walk_away, 0) + x.prequal.max_amount)],
                   ["Financing", (x: Json) => (x.prequal.decision === "PREQUALIFIED" ? "Qualifies" : x.prequal.decision === "DECLINE" ? "Does not qualify" : "Needs review")],

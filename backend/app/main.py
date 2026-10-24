@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from . import ai, comps, crs, db, live, playbook  # noqa: E402
+from . import ai, ask, comps, crs, db, live, playbook  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -32,6 +32,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _agent(cid: str, name: str, status: str, text: str, at: Optional[str] = None):
+    """Record one agent step for the work-in-the-open feed (and SpacetimeDB when it is on)."""
+    db.step(cid, name, status, text, at)
+    live.agent(cid, name, status, text)
 
 
 def _claim(cid: str) -> dict:
@@ -80,6 +86,7 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     else:
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
 
+    started = db.now()
     if ai.available():
         try:
             claim, by = ai.extract_claim(pdf).model_dump(), "claude"
@@ -93,10 +100,18 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
                      "extracted_by": by, "created_at": db.now()})
     v = claim["vehicle"]
-    live.agent(cid, "Reader", "done", f"Read the report ({by}): {v['year']} {v['make']} {v['model']}, "
+    pages = fitz.open(stream=pdf, filetype="pdf").page_count
+    _agent(cid, "Reader", "working", f"Opened the report: {pages} page{'s' if pages != 1 else ''}", at=started)
+    _agent(cid, "Reader", "done", f"Read the report ({by}): {v['year']} {v['make']} {v['model']}, "
                                       f"{len(claim['comparables'])} comparables, offer ${claim['offer']['total']:,.2f}")
     db.log(cid, "extracted", {"by": by, "comparables": len(claim["comparables"])})
     return {"id": cid, "claim": claim, "extracted_by": by, "sample": sample}
+
+
+@app.get("/api/claims/{cid}/steps")
+def agent_steps(cid: str):
+    _claim(cid)
+    return db.steps(cid)
 
 
 @app.get("/api/vin/{vin}")
@@ -180,18 +195,24 @@ def audit(cid: str):
     data = _claim(cid)
     claim = Claim(**data["claim"])
     v = claim.vehicle
+    _agent(cid, "Appraiser", "working", "Checking the report against the 10 rules in 10 CCR § 2695.8")
     checks = run_checks(claim)
     failed = _failed_checks(checks)
-    live.agent(cid, "Appraiser", "working", f"Ran the 10 checks under 10 CCR § 2695.8: {failed} failed. "
-                                            f"Pulling live {v.year} {v.make} {v.model} listings near {claim.owner_zip[:3]}xx")
+    _agent(cid, "Appraiser", "working", f"{failed} of 10 checks failed")
+    _agent(cid, "Appraiser", "working", f"Searching listings: {v.year} {v.make} {v.model} within "
+                                        f"{LOCAL_RADIUS_MI} mi of {claim.owner_zip[:3]}xx")
     try:
         market = comps.search(v.make, v.model, v.year, v.year, claim.owner_zip, LOCAL_RADIUS_MI)
     except Exception as e:
-        live.agent(cid, "Appraiser", "error", f"Market search failed: {e}")
+        _agent(cid, "Appraiser", "error", f"Market search failed: {e}")
         raise HTTPException(502, f"Could not fetch market listings: {e}")
 
+    _agent(cid, "Appraiser", "working", f"Found {len(market['listings'])} listings ({market['source']})")
     matches = comparable_listings(market["listings"], v)
+    _agent(cid, "Appraiser", "working", f"Kept {len(matches)} with the same year and trim")
     fv = fair_value(matches, v.mileage)
+    if fv:
+        _agent(cid, "Appraiser", "working", f"Fit price against mileage: ${fv['estimate']:,} at {v.mileage:,} mi")
     co = counteroffer(claim, fv["estimate"]) if fv else None
     recomputed_base = round(sum(c.adjusted_value if c.adjusted_value is not None else c.list_price
                                 for c in claim.comparables) / max(len(claim.comparables), 1), 2)
@@ -209,7 +230,7 @@ def audit(cid: str):
                      "insurer_exception_may_apply": reopen_exception(claim)},
     }
     db.update(cid, audit=result)
-    live.agent(cid, "Appraiser", "done",
+    _agent(cid, "Appraiser", "done",
                f"{len(matches)} true comparables of {len(market['listings'])} listings ({market['source']}); "
                + (f"market value ${fv['estimate']:,} vs insurer base ${claim.offer.base_value:,.0f}; gap ${co['gap']:,.0f}"
                   if co else "no matching listings"))
@@ -227,7 +248,8 @@ def draft(cid: str):
         raise HTTPException(400, "Run the audit first")
     claim = Claim(**data["claim"])
     evidence = build_evidence(claim, data["audit"])
-    live.agent(cid, "Negotiator", "working", f"Drafting the counteroffer from {len(evidence)} pieces of evidence")
+    _agent(cid, "Negotiator", "working", f"Collected {len(evidence)} facts from the audit as evidence")
+    _agent(cid, "Negotiator", "working", "Writing the draft with Claude" if ai.available() else "Writing the draft from the template")
     if ai.available():
         try:
             letter, by = ai.draft_letter(evidence), "claude"
@@ -235,10 +257,11 @@ def draft(cid: str):
             raise HTTPException(502, f"Claude could not draft the letter: {e}")
     else:
         letter, by = template_letter(claim, evidence), "template (Claude not configured)"
+    _agent(cid, "Negotiator", "working", "Checking every dollar amount against the evidence")
     sentences = ai.citation_check(letter, evidence)
     db.update(cid, evidence=evidence, letter={"sentences": sentences, "drafted_by": by, "drafted_at": db.now()})
     rejected = sum(1 for s in sentences if not s["ok"])
-    live.agent(cid, "Negotiator", "done", f"Draft ready ({by}): {len(sentences)} sentences, "
+    _agent(cid, "Negotiator", "done", f"Draft ready ({by}): {len(sentences)} sentences, "
                                           f"{rejected} rejected by the citation check. Waiting for your approval")
     db.log(cid, "letter_drafted", {"by": by, "rejected": rejected})
     return {"sentences": sentences, "evidence": evidence, "drafted_by": by}
@@ -259,6 +282,27 @@ def approve(cid: str, body: Approval):
     db.update(cid, letter=letter)
     db.log(cid, "letter_approved", {"sentences": len(checked)})
     return {"ok": True, "approved_at": letter["approved_at"]}
+
+
+class Question(BaseModel):
+    question: str
+
+
+@app.post("/api/claims/{cid}/ask")
+def ask_case(cid: str, body: Question):
+    """Ask about your case. Answers come only from the case file and the rule text, each sentence cited."""
+    data = _claim(cid)
+    if "audit" not in data:
+        raise HTTPException(400, "Run the audit first")
+    q = body.question.strip()
+    if not 3 <= len(q) <= 500:
+        raise HTTPException(422, "Ask a question between 3 and 500 characters")
+    try:
+        result = ask.answer(q, data)
+    except Exception as e:
+        raise HTTPException(502, f"Could not answer: {e}")
+    db.log(cid, "asked", {"found": result["found"], "by": result["by"]})
+    return result
 
 
 def _require_approved(cid: str) -> dict:
@@ -298,6 +342,7 @@ def payout(cid: str, body: PayoutRequest):
     data = _claim(cid)
     _require_crs()
     claim = Claim(**data["claim"])
+    _agent(cid, "Banker", "working", "Pulling the CRS credit report for the test profile")
     try:
         credit = crs.credit_summary(body.persona, crs.demo_mode())
     except Exception as e:
@@ -310,7 +355,7 @@ def payout(cid: str, body: PayoutRequest):
     }
     db.update(cid, payout=result)
     np_ = result["at_counteroffer"] or result["at_offer"]
-    live.agent(cid, "Shopper", "done", f"CRS ({credit['source']}): {len(credit['auto_loans'])} auto loan(s); walk away with "
+    _agent(cid, "Banker", "done", f"CRS ({credit['source']}): {len(credit['auto_loans'])} auto loan(s); walk away with "
                                        f"${np_['walk_away']:,.0f}; financing {np_['prequal']['decision'].lower()}")
     db.log(cid, "payout", {"persona": body.persona, "source": credit["source"]})
     return result
@@ -351,11 +396,14 @@ def replace(cid: str):
     np_ = p["at_counteroffer"] or p["at_offer"]
     budget = max(np_["walk_away"], 0) + np_["prequal"]["max_amount"]
     v = claim.vehicle
+    _agent(cid, "Shopper", "working", f"Searching listings: {v.year}–{v.year + 2} {v.make} {v.model} near "
+                                      f"{claim.owner_zip[:3]}xx")
     try:
         market = comps.search(v.make, v.model, v.year, v.year + 2, claim.owner_zip, LOCAL_RADIUS_MI)
     except Exception as e:
         raise HTTPException(502, f"Could not fetch replacement listings: {e}")
     within = [l for l in market["listings"] if l.get("price") and l["price"] <= budget]
+    _agent(cid, "Shopper", "working", f"{len(within)} of {len(market['listings'])} listings fit the ${budget:,.0f} budget")
     for l in within:
         l["market_value"], l["market_basis"] = _market_value(l, market["listings"])
         l["value_gap"] = round(l["market_value"] - l["price"])
@@ -365,7 +413,7 @@ def replace(cid: str):
     result = {"budget": round(budget, 2), "walk_away": np_["walk_away"], "financing": np_["prequal"],
               "source": market["source"], "fetched_at": market["fetched_at"], "shortlist": ranked}
     db.update(cid, replace=result)
-    live.agent(cid, "Shopper", "done", f"{len(ranked)} cars under the ${result['budget']:,.0f} budget, ranked by value")
+    _agent(cid, "Shopper", "done", f"{len(ranked)} cars under the ${result['budget']:,.0f} budget, ranked by value")
     db.log(cid, "shortlist", {"budget": result["budget"], "count": len(ranked)})
     return result
 
@@ -379,11 +427,14 @@ class SellerCheck(BaseModel):
 def seller_check(cid: str, body: SellerCheck):
     data = _claim(cid)
     _require_crs()
+    seller = (_shortlisted(data, body.vin) or {}).get("seller_name") or "the seller"
+    _agent(cid, "Shopper", "working", f"Checking {seller}'s identity and liens with CRS")
     try:
         result = crs.seller_check(body.persona, crs.demo_mode())
     except Exception as e:
         raise HTTPException(502, f"CRS seller check failed: {e}")
     result.update(vin=body.vin, clean=not result["flags"], at=db.now())
+    _agent(cid, "Shopper", "done", f"{seller}: " + ("passed, deposit unlocked" if result["clean"] else "deposit locked"))
     db.update(cid, seller_checks=dict(data.get("seller_checks") or {}, **{body.vin: result}))
     db.log(cid, "seller_check", {"vin": body.vin, "persona": body.persona, "verdict": result["verdict"]})
     return result
@@ -544,7 +595,7 @@ def open_auction(cid: str, body: AuctionRequest):
         live.open_auction(cid, wanted, budget, True, float(np_["prequal"]["max_amount"]), claim.owner_zip[:3], duration)
     except RuntimeError as e:
         raise HTTPException(502, str(e))
-    live.agent(cid, "Shopper", "working", f"Opened a {duration // 60}-minute reverse auction: dealers compete to sell a "
+    _agent(cid, "Shopper", "working", f"Opened a {duration // 60}-minute reverse auction: dealers compete to sell a "
                                           f"{wanted} under the verified ${budget:,.0f} budget")
     db.log(cid, "auction_opened", {"budget": budget, "duration_secs": duration})
     return {"auction_id": cid, "wanted": wanted, "budget": budget, "duration_secs": duration}
@@ -571,7 +622,7 @@ def award(cid: str, body: AwardRequest):
            "seller_name": b["dealer_name"], "seller_type": "DEALER", "bid_id": int(body.bid_id),
            "year": None, "make": None, "model": None, "trim": None}
     db.update(cid, auction_win=win)
-    live.agent(cid, "Shopper", "done", f"You chose {b['dealer_name']}: {b['car']} for ${b['price']:,.0f}")
+    _agent(cid, "Shopper", "done", f"You chose {b['dealer_name']}: {b['car']} for ${b['price']:,.0f}")
     db.log(cid, "auction_awarded", {"bid_id": int(body.bid_id), "price": b["price"]})
     return win
 

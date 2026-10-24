@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API, call, Json } from "@/lib/api";
+import { Reveal } from "./motion";
 import { Badge, Button } from "./ui";
 
 const linkCls = "font-semibold text-brand underline underline-offset-4 hover:text-brand-dark";
@@ -20,7 +21,8 @@ export default function IfNo({ id }: { id: string }) {
   const esc = plan.escalation;
 
   return (
-    <section className="space-y-6 rounded-2xl ring-1 ring-line p-5 sm:p-6">
+    <Reveal>
+    <section className="space-y-6 rounded-[28px] bg-surface p-5 shadow-[0_0_0_1px_rgba(11,31,77,0.07),0_14px_30px_-14px_rgba(11,31,77,0.25)] sm:p-6">
       <div>
         <h2 className="font-serif text-2xl font-semibold text-ink">If they say no</h2>
         <p className="mt-1 max-w-prose text-base text-muted">Your next steps, in order, with the dates that apply to your claim.</p>
@@ -81,5 +83,6 @@ export default function IfNo({ id }: { id: string }) {
       )}
       <p className="text-sm text-muted">Not legal advice.</p>
     </section>
+    </Reveal>
   );
 }

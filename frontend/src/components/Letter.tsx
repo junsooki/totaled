@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Json, post } from "@/lib/api";
-import { Badge, Button } from "./ui";
+import { Button, OkCard } from "./ui";
 
 export default function Letter({ id, letter, onApproved }: { id: string; letter: Json; onApproved: () => void }) {
   const original: Json[] = letter.sentences;
@@ -96,7 +96,9 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
         </ol>
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="mx-auto max-w-2xl">
+      <OkCard title={approved ? "This letter goes out in your name." : "Approve this letter to go out in your name?"} done={approved}>
+      <div className="space-y-4">
         {rejected > 0 && (
           <p className="text-base font-medium text-alert">
             {rejected} {rejected === 1 ? "sentence does" : "sentences do"} not pass the check. Each dollar amount must
@@ -106,7 +108,6 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
         {error && <p role="alert" className="text-base text-alert">{error}</p>}
         {approved ? (
           <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="green">Approved</Badge>
             <Button variant="secondary" onClick={() => navigator.clipboard.writeText(texts.join("\n\n"))}>Copy letter</Button>
           </div>
         ) : (
@@ -120,6 +121,8 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
         <p className="text-sm text-muted">
           Drafted by {letter.drafted_by === "claude" ? "Claude" : letter.drafted_by}.
         </p>
+      </div>
+      </OkCard>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { API, Json, usd } from "@/lib/api";
+import { CountUp, Reveal } from "./motion";
 import { Badge, Stat } from "./ui";
 import { Bridge, Market } from "./ValueCharts";
 
@@ -16,6 +17,12 @@ const TABS = [
 function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.ReactNode> }) {
   const [active, setActive] = useState(0);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pill, setPill] = useState({ left: 0, width: 0 });
+  // The white pill slides under the selected tab.
+  useLayoutEffect(() => {
+    const el = refs.current[active];
+    if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [active]);
 
   const onKey = (e: React.KeyboardEvent) => {
     const last = TABS.length - 1;
@@ -33,7 +40,9 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
 
   return (
     <div>
-      <div role="tablist" aria-label="Audit results" onKeyDown={onKey} className="flex gap-1 overflow-x-auto border-b border-line">
+      <div role="tablist" aria-label="Audit results" onKeyDown={onKey} className="relative inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-cream p-1 ring-1 ring-line">
+        <span aria-hidden="true" className="absolute top-1 bottom-1 rounded-full bg-surface shadow-[0_0_0_1px_rgba(11,31,77,0.07),0_6px_14px_-8px_rgba(11,31,77,0.45)] transition-all duration-300 ease-out"
+          style={{ left: pill.left, width: pill.width }} />
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -44,8 +53,8 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
             aria-controls={`audit-panel-${t.id}`}
             tabIndex={active === i ? 0 : -1}
             onClick={() => setActive(i)}
-            className={`-mb-px shrink-0 cursor-pointer rounded-t-lg border-b-2 px-4 py-3 text-base font-semibold transition-colors ${focusRing} ${
-              active === i ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"
+            className={`relative shrink-0 cursor-pointer rounded-full px-4 py-2 text-base font-medium transition-colors ${focusRing} ${
+              active === i ? "text-ink" : "text-muted hover:text-ink"
             }`}
           >
             {t.label}
@@ -283,10 +292,11 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
 
   return (
     <div className="space-y-10">
-      <div className="text-center">
-        <p className="text-lg text-muted">Your insurer may owe you about</p>
-        <p className="mt-1 font-serif text-6xl font-semibold tracking-tight text-brand sm:text-7xl">{co ? usd(co.gap) : "—"}</p>
-        <p className="mx-auto mt-3 max-w-prose text-lg text-ink">
+      <div className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(150deg,#0b1f4d,#132c8f_55%,#1633c9)] px-6 py-10 text-center text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-20 -bottom-24 size-72 rounded-full bg-[radial-gradient(closest-side,rgba(255,163,107,0.5),transparent)]" />
+        <p className="relative text-lg text-white/70">Your insurer may owe you about</p>
+        <p className="relative mt-1 text-6xl font-light tracking-[-0.03em] sm:text-8xl">{co ? <CountUp value={co.gap} format={(n) => usd(n)} /> : "—"}</p>
+        <p className="relative mx-auto mt-3 max-w-prose text-lg text-white/85">
           {co
             ? `That is the gap between their offer of ${usd(claim.offer.total)} and a fair total of ${usd(co.total)}.`
             : "We could not work out a fair total without matching listings."}
@@ -305,7 +315,7 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
         </p>
       </div>
 
-      <Tabs panels={{ failed: failedPanel, market: marketPanel, gap: gapPanel }} />
+      <Reveal><Tabs panels={{ failed: failedPanel, market: marketPanel, gap: gapPanel }} /></Reveal>
     </div>
   );
 }

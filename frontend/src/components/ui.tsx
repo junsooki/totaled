@@ -139,7 +139,7 @@ export function StepCard({
   footer?: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_rgba(11,31,77,0.06),0_30px_60px_-30px_rgba(11,31,77,0.3)] sm:p-10">
+    <section className="animate-rise rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_rgba(11,31,77,0.06),0_30px_60px_-30px_rgba(11,31,77,0.3)] sm:p-10">
       <h1 tabIndex={-1} className="font-serif text-3xl font-semibold tracking-tight text-ink outline-none sm:text-4xl">{title}</h1>
       {subtitle && <p className="mt-2 max-w-prose text-lg text-muted">{subtitle}</p>}
       {children && <div className="mt-8">{children}</div>}
@@ -180,5 +180,20 @@ export function SummaryPanel({ title = "Your case", rows, children }: { title?: 
       </dl>
       {children}
     </aside>
+  );
+}
+
+/** A moment where nothing happens without the user: Cruma's "You decide what needs your OK". */
+export function OkCard({ title, children, done }: { title: string; children: ReactNode; done?: boolean }) {
+  return (
+    <section className="relative overflow-hidden rounded-[28px] bg-surface p-6 shadow-[0_0_0_1px_rgba(11,31,77,0.07),0_30px_50px_-24px_rgba(11,31,77,0.3)] sm:p-7">
+      <div aria-hidden="true" className="pointer-events-none absolute -top-24 -right-24 size-64 rounded-full bg-[radial-gradient(closest-side,rgba(255,163,107,0.35),transparent)]" />
+      <p className="relative flex items-center gap-2 text-sm font-semibold text-brand">
+        <span aria-hidden="true" className={`size-2 rounded-full ${done ? "bg-brand" : "animate-pulse bg-[#ff8a4c]"}`} />
+        {done ? "Approved by you" : "Needs your OK"}
+      </p>
+      <h3 className="relative mt-1 text-2xl font-light tracking-[-0.02em] text-ink sm:text-3xl">{title}</h3>
+      <div className="relative mt-4">{children}</div>
+    </section>
   );
 }
