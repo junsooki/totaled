@@ -50,7 +50,7 @@ export function Bridge({ steps }: { steps: Json[] }) {
 
   return (
     <figure className="viz-root relative">
-      <figcaption className="mb-1 text-sm font-medium">Where the extra {usd(steps[steps.length - 1].amount - steps[0].amount)} comes from</figcaption>
+      <figcaption className="mb-2 font-serif text-xl font-semibold text-ink">Where the extra {usd(steps[steps.length - 1].amount - steps[0].amount)} comes from</figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img"
         aria-label={rows.map((r) => `${r.label} ${usd(r.amount)}`).join(", ")} onMouseLeave={() => setTip(null)}>
         {ticks(lo, hi).map((t) => (
@@ -97,7 +97,7 @@ export function Bridge({ steps }: { steps: Json[] }) {
         })}
       </svg>
       <Tooltip tip={tip} />
-      <p className="text-xs" style={{ color: "var(--viz-text-3)" }}>
+      <p className="text-sm" style={{ color: "var(--viz-text-3)" }}>
         Totals are marked as levels; each bar is one correction, computed by code from the report and live listings.
       </p>
     </figure>
@@ -131,8 +131,8 @@ export function Market({ listings, fair, mileage, insurer }: { listings: Json[];
 
   return (
     <figure className="viz-root relative">
-      <figcaption className="mb-1 text-sm font-medium">Live market: price against mileage</figcaption>
-      <div className="mb-1 flex flex-wrap gap-4 text-xs" style={{ color: "var(--viz-text-2)" }}>
+      <figcaption className="mb-2 font-serif text-xl font-semibold text-ink">Live market: price against mileage</figcaption>
+      <div className="mb-2 flex flex-wrap gap-4 text-sm" style={{ color: "var(--viz-text-2)" }}>
         <span><svg width="10" height="10" className="mr-1 inline"><circle cx="5" cy="5" r="4" fill="var(--viz-series-1)" /></svg>Listings now ({pts.length})</span>
         <span><svg width="10" height="10" className="mr-1 inline"><rect x="1" y="1" width="8" height="8" fill="var(--viz-series-2)" /></svg>Insurer&apos;s comparables (adjusted)</span>
         <span><svg width="14" height="10" className="mr-1 inline"><line x1="0" y1="5" x2="14" y2="5" stroke="var(--viz-text-2)" strokeWidth="2" /></svg>Market line</span>

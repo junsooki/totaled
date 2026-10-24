@@ -15,30 +15,30 @@ export default function AgentFeed({ claimId }: { claimId: string }) {
   const latest = new Map(mine.map((s) => [s.agent, s]));
 
   return (
-    <div className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Agents at work</h3>
-        <span className="text-xs text-zinc-500">live · SpacetimeDB</span>
+    <div className="rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-serif text-xl font-semibold text-ink">Agents at work</h3>
+        <span className="text-sm text-muted">Live</span>
       </div>
-      <div className="mb-3 grid grid-cols-5 gap-1 text-center text-[11px]">
+      <ul className="mt-3 divide-y divide-line">
         {AGENTS.map((a) => {
           const s = latest.get(a);
           return (
-            <div key={a} className="rounded bg-zinc-100 px-1 py-1 dark:bg-zinc-900">
-              <div className="font-medium">{a}</div>
-              {s ? <Badge tone={tone(s.status)}>{s.status}</Badge> : <span className="text-zinc-400">idle</span>}
-            </div>
+            <li key={a} className="flex items-center justify-between gap-3 py-2">
+              <span className="text-base font-medium text-ink">{a}</span>
+              {s ? <Badge tone={tone(s.status)}>{s.status}</Badge> : <span className="text-sm text-muted">Idle</span>}
+            </li>
           );
         })}
-      </div>
-      <ol className="max-h-56 space-y-1 overflow-y-auto text-xs">
+      </ul>
+      <ol className="mt-4 max-h-56 space-y-2 overflow-y-auto border-t border-line pt-4 text-sm">
         {[...mine].reverse().map((s) => (
-          <li key={s.id.toString()} className="leading-snug">
-            <span className="text-zinc-400">{new Date(micros(s.at)).toLocaleTimeString()}</span>{" "}
-            <b>{s.agent}</b> <Badge tone={tone(s.status)}>{s.status}</Badge> {s.text}
+          <li key={s.id.toString()} className="leading-snug text-ink">
+            <span className="text-muted">{new Date(micros(s.at)).toLocaleTimeString()}</span>{" "}
+            <span className="font-semibold">{s.agent}</span> {s.text}
           </li>
         ))}
-        {!mine.length && <li className="text-zinc-500">Waiting for the first agent…</li>}
+        {!mine.length && <li className="text-muted">Waiting for the first agent...</li>}
       </ol>
     </div>
   );

@@ -9,6 +9,7 @@ import { usd } from "@/lib/api";
 import { LiveProvider, micros } from "@/lib/live";
 import { reducers, tables } from "@/module_bindings";
 
+const field = `${inputCls} min-h-12`;
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^.*?SenderError:?\s*/i, "");
 
 function Dealer() {
@@ -35,23 +36,26 @@ function Dealer() {
     .filter((a) => a.status === "open" && micros(a.endsAt) > now)
     .sort((a, b) => (a.auctionId === focus ? -1 : b.auctionId === focus ? 1 : micros(a.endsAt) - micros(b.endsAt)));
 
-  if (!isActive) return <p className="text-sm text-zinc-500">Connecting…</p>;
+  if (!isActive) return <p className="text-base text-muted">Connecting...</p>;
 
   if (!me) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-zinc-500">Verified buyers with audited payouts and prequalified financing. Join to bid.</p>
-        <input className={inputCls} placeholder="Dealership name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Button onClick={() => join({ name }).catch((e) => setMsg({ join: errText(e) }))} disabled={!name.trim()}>Join as a dealer</Button>
-        {msg.join && <p className="text-sm text-red-600">{msg.join}</p>}
+      <div className="space-y-4 rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line sm:p-8">
+        <h2 className="font-serif text-2xl font-semibold text-ink">Join to bid</h2>
+        <p className="text-base text-muted">Verified buyers with audited payouts and prequalified financing.</p>
+        <input className={`${field} text-lg`} aria-label="Dealership name" placeholder="Dealership name" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="[&>button]:w-full">
+          <Button onClick={() => join({ name }).catch((e) => setMsg({ join: errText(e) }))} disabled={!name.trim()}>Join as a dealer</Button>
+        </div>
+        {msg.join && <p className="text-base text-alert">{msg.join}</p>}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm">Bidding as <b>{me.name}</b></p>
-      {!open.length && <p className="text-sm text-zinc-500">No open auctions right now. This page updates live.</p>}
+    <div className="space-y-5">
+      <p className="text-base text-ink">Bidding as <span className="font-semibold">{me.name}</span></p>
+      {!open.length && <p className="rounded-3xl bg-surface p-5 text-base text-muted shadow-sm ring-1 ring-line">No open auctions right now. This page updates live.</p>}
       {open.map((a) => {
         const ab = bids.filter((b) => b.auctionId === a.auctionId).sort((x, y) => x.price - y.price);
         const best = ab[0];
@@ -61,45 +65,61 @@ function Dealer() {
         const left = micros(a.endsAt) - now;
         const leading = best && identity && best.dealer.isEqual(identity);
         return (
-          <div key={a.auctionId} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
-            <div className="flex items-baseline justify-between">
-              <div className="font-semibold">{a.wanted}</div>
-              <div className={`text-2xl font-semibold tabular-nums ${left < 30000 ? "text-red-600" : ""}`}>{clock(left)}</div>
+          <div key={a.auctionId} className="rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-line sm:p-8">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-serif text-xl font-semibold text-ink">{a.wanted}</h2>
+              <div className={`font-serif text-4xl font-semibold tabular-nums ${left < 30000 ? "text-alert" : "text-ink"}`}>{clock(left)}</div>
             </div>
-            <div className="mt-1 flex flex-wrap gap-1 text-xs">
-              <Badge tone="green">payout audited</Badge>
-              {a.financingApproved > 0 && <Badge tone="green">financing prequalified {usd(a.financingApproved)}</Badge>}
-              <Badge>area {a.zip3}xx</Badge>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge tone="green">Payout audited</Badge>
+              {a.financingApproved > 0 && <Badge tone="green">Financing prequalified {usd(a.financingApproved)}</Badge>}
+              <Badge>Area {a.zip3}xx</Badge>
             </div>
-            <p className="mt-2 text-sm">
-              Budget <b>{usd(a.budget)}</b> · best offer {best ? <b>{usd(best.price)}</b> : "none yet"}
-              {mineBest && <> · yours {usd(mineBest.price)} {leading ? <Badge tone="green">leading</Badge> : <Badge tone="amber">outbid</Badge>}</>}
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input className={`${inputCls} col-span-2`} placeholder="Car (e.g. 2020 Honda Civic EX)" value={f.car} onChange={(e) => set("car", e.target.value)} />
-              <input className={inputCls} placeholder="Mileage" inputMode="numeric" value={f.mileage} onChange={(e) => set("mileage", e.target.value)} />
-              <input className={inputCls} placeholder="Price ($)" inputMode="numeric" value={f.price} onChange={(e) => set("price", e.target.value)} />
-              <input className={`${inputCls} col-span-2`} placeholder="VIN (optional)" value={f.vin} onChange={(e) => set("vin", e.target.value)} />
+            <dl className="mt-5 grid grid-cols-2 gap-4">
+              <div>
+                <dt className="text-sm text-muted">Buyer budget</dt>
+                <dd className="font-serif text-3xl font-semibold tracking-tight text-ink">{usd(a.budget)}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Best offer</dt>
+                <dd className="font-serif text-3xl font-semibold tracking-tight text-ink">{best ? usd(best.price) : "None yet"}</dd>
+              </div>
+            </dl>
+            {mineBest && (
+              <p className="mt-3 text-base text-ink">
+                Your offer {usd(mineBest.price)} {leading ? <Badge tone="green">Leading</Badge> : <Badge tone="amber">Outbid</Badge>}
+              </p>
+            )}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <input className={`${field} col-span-2`} aria-label="Car" placeholder="Car (e.g. 2020 Honda Civic EX)" value={f.car} onChange={(e) => set("car", e.target.value)} />
+              <input className={field} aria-label="Mileage" placeholder="Mileage" inputMode="numeric" value={f.mileage} onChange={(e) => set("mileage", e.target.value)} />
+              <input className={`${field} font-serif text-xl font-semibold`} aria-label="Price" placeholder="Price ($)" inputMode="numeric" value={f.price} onChange={(e) => set("price", e.target.value)} />
+              <input className={`${field} col-span-2`} aria-label="VIN" placeholder="VIN (optional)" value={f.vin} onChange={(e) => set("vin", e.target.value)} />
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Button
-                disabled={!f.car || !f.price}
-                onClick={() => {
-                  setMsg({ ...msg, [a.auctionId]: "" });
-                  placeBid({ auctionId: a.auctionId, car: f.car, vin: f.vin, mileage: Number(f.mileage) || 0, price: Number(f.price) })
-                    .then(() => setMsg({ ...msg, [a.auctionId]: "Offer placed" }))
-                    .catch((e) => setMsg({ ...msg, [a.auctionId]: errText(e) }));
-                }}
-              >
-                Place offer
-              </Button>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="[&>button]:w-full">
+                <Button
+                  disabled={!f.car || !f.price}
+                  onClick={() => {
+                    setMsg({ ...msg, [a.auctionId]: "" });
+                    placeBid({ auctionId: a.auctionId, car: f.car, vin: f.vin, mileage: Number(f.mileage) || 0, price: Number(f.price) })
+                      .then(() => setMsg({ ...msg, [a.auctionId]: "Offer placed" }))
+                      .catch((e) => setMsg({ ...msg, [a.auctionId]: errText(e) }));
+                  }}
+                >
+                  Place offer
+                </Button>
+              </div>
               {best && (
-                <button className="text-xs underline" onClick={() => set("price", String(Math.floor(best.price - 100)))}>
+                <button
+                  className="min-h-11 cursor-pointer rounded-xl text-base font-semibold text-brand underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  onClick={() => set("price", String(Math.floor(best.price - 100)))}
+                >
                   Beat best by $100
                 </button>
               )}
             </div>
-            {msg[a.auctionId] && <p className={`mt-1 text-sm ${msg[a.auctionId] === "Offer placed" ? "text-green-700" : "text-red-600"}`}>{msg[a.auctionId]}</p>}
+            {msg[a.auctionId] && <p className={`mt-2 text-base ${msg[a.auctionId] === "Offer placed" ? "text-brand" : "text-alert"}`}>{msg[a.auctionId]}</p>}
           </div>
         );
       })}
@@ -109,9 +129,9 @@ function Dealer() {
 
 export default function DealerClient() {
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-8 font-sans">
-      <h1 className="text-2xl font-semibold tracking-tight">Totaled · dealer bidding</h1>
-      <p className="mt-1 text-sm text-zinc-500">Compete live for buyers who already know what they can spend.</p>
+    <main className="mx-auto w-full max-w-lg px-4 py-8 font-sans text-ink">
+      <h1 className="font-serif text-3xl font-semibold tracking-tight">Totaled dealer bidding</h1>
+      <p className="mt-2 text-lg text-muted">Compete live for buyers who already know what they can spend.</p>
       <div className="mt-6">
         <LiveProvider><Dealer /></LiveProvider>
       </div>

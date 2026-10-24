@@ -52,18 +52,18 @@ export default function LiveAuction({ claimId, onAwarded }: { claimId: string; o
 
   if (!auction) {
     return (
-      <div className="rounded border border-zinc-200 p-4 dark:border-zinc-800">
-        <h3 className="font-semibold">Let dealers compete for you</h3>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="rounded-3xl bg-brand-soft p-6">
+        <h3 className="font-serif text-2xl font-semibold text-ink">Let dealers compete for you</h3>
+        <p className="mt-2 max-w-prose text-base text-ink">
           Your payout is audited and your financing is prequalified, so you&apos;re a verified buyer. Open a live reverse
-          auction: dealers see your budget (never your name), bid against each other in real time, and can only lower their price.
+          auction. Dealers see your budget, never your name. They bid against each other in real time and can only lower their price.
         </p>
-        <div className="mt-3">
+        <div className="mt-4">
           <Button onClick={() => act("open", async () => { await post(`/api/claims/${claimId}/auction`, { duration_secs: 180 }); })} disabled={busy === "open"}>
             {busy === "open" ? "Opening…" : "Start a 3-minute live auction"}
           </Button>
         </div>
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-3 text-base text-alert">{error}</p>}
       </div>
     );
   }
@@ -74,59 +74,58 @@ export default function LiveAuction({ claimId, onAwarded }: { claimId: string; o
   const dealers = new Set(mine.map((b) => b.dealerName)).size;
 
   return (
-    <div className="rounded border-2 border-zinc-900 p-4 dark:border-white">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-6 rounded-3xl bg-brand-soft p-6">
         <div>
-          <h3 className="font-semibold">Live auction: {auction.wanted}</h3>
-          <p className="text-sm text-zinc-500">
-            Verified budget {usd(auction.budget)} · {dealers} dealer{dealers === 1 ? "" : "s"} · {mine.length} offer{mine.length === 1 ? "" : "s"}
-          </p>
-          <div className={`mt-2 text-4xl font-semibold tabular-nums ${open && left < 30000 ? "text-red-600" : ""}`}>
+          <h3 className="font-serif text-xl font-semibold text-ink">Live auction: {auction.wanted}</h3>
+          <div className={`mt-2 font-serif text-5xl font-semibold tabular-nums ${open && left < 30000 ? "text-alert" : "text-ink"}`}>
             {auction.status === "awarded" ? "Awarded" : open ? clock(left) : "Ended"}
           </div>
-          {open && <p className="text-xs text-zinc-500">A bid in the last 30 seconds adds 30 seconds.</p>}
+          {open && <p className="mt-1 text-sm text-muted">A bid in the last 30 seconds adds 30 seconds.</p>}
+          <p className="mt-3 text-base text-ink">
+            Your budget {usd(auction.budget)}. {dealers} dealer{dealers === 1 ? "" : "s"}, {mine.length} offer{mine.length === 1 ? "" : "s"}.
+          </p>
           {best && (
-            <p className="mt-2 text-sm">
-              Best offer <b>{usd(best.price)}</b> from {best.dealerName}: {usd(auction.budget - best.price)} under your budget
+            <p className="mt-1 text-base text-ink">
+              Best offer <span className="font-semibold">{usd(best.price)}</span> from {best.dealerName}, {usd(auction.budget - best.price)} under your budget.
             </p>
           )}
         </div>
         {qr && open && (
-          <div className="text-center text-xs text-zinc-500">
+          <div className="text-center text-sm text-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qr} alt="Scan to bid as a dealer" className="mx-auto h-32 w-32 rounded bg-white p-1" />
-            Dealers: scan to bid
-            <div className="max-w-40 truncate"><a className="underline" href={dealerUrl} target="_blank" rel="noreferrer">{dealerUrl.replace(/^https?:\/\//, "")}</a></div>
+            <img src={qr} alt="Scan to bid as a dealer" className="mx-auto size-32 rounded-xl bg-white p-2" />
+            <p className="mt-2 font-medium text-ink">Dealers, scan to bid</p>
+            <div className="max-w-40 truncate"><a className="text-brand underline" href={dealerUrl} target="_blank" rel="noreferrer">{dealerUrl.replace(/^https?:\/\//, "")}</a></div>
           </div>
         )}
       </div>
 
-      <ol className="mt-4 space-y-2">
+      <ol className="mt-4 space-y-3">
         {mine.map((b, i) => {
           const won = auction.winningBidId === b.id;
           return (
-            <li key={b.id.toString()} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm transition-all ${
-              won ? "border-green-600 bg-green-50 dark:bg-green-950" : i === 0 ? "border-zinc-900 dark:border-white" : "border-zinc-200 dark:border-zinc-800"}`}>
-              <div>
-                <div className="font-medium">{i === 0 && !won && <Badge tone="green">best</Badge>} {b.car}</div>
-                <div className="text-xs text-zinc-500">{b.dealerName} · {b.mileage.toLocaleString()} mi{b.vin ? ` · VIN ${b.vin}` : ""} · {new Date(micros(b.at)).toLocaleTimeString()}</div>
+            <li key={b.id.toString()} className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-surface p-5 ${
+              won ? "ring-2 ring-brand" : i === 0 ? "shadow-sm ring-2 ring-brand/40" : "shadow-sm ring-1 ring-line"}`}>
+              <div className="min-w-0">
+                <div className="font-serif text-3xl font-semibold tabular-nums tracking-tight text-ink">
+                  {usd(b.price)} {won ? <Badge tone="green">Your pick</Badge> : i === 0 && <Badge tone="green">Best offer</Badge>}
+                </div>
+                <div className="mt-1 text-base font-medium text-ink">{b.car}</div>
+                <div className="text-sm text-muted">{b.dealerName} · {b.mileage.toLocaleString()} mi{b.vin ? ` · VIN ${b.vin}` : ""} · {new Date(micros(b.at)).toLocaleTimeString()}</div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-semibold tabular-nums">{usd(b.price)}</span>
-                {auction.status !== "awarded" && (
-                  <Button variant={i === 0 ? "primary" : "secondary"} disabled={!!busy}
-                    onClick={() => act(`a${b.id}`, async () => onAwarded(await post(`/api/claims/${claimId}/auction/award`, { bid_id: Number(b.id) })))}>
-                    {busy === `a${b.id}` ? "Choosing…" : "Choose"}
-                  </Button>
-                )}
-                {won && <Badge tone="green">your pick</Badge>}
-              </div>
+              {auction.status !== "awarded" && (
+                <Button variant={i === 0 ? "primary" : "secondary"} disabled={!!busy}
+                  onClick={() => act(`a${b.id}`, async () => onAwarded(await post(`/api/claims/${claimId}/auction/award`, { bid_id: Number(b.id) })))}>
+                  {busy === `a${b.id}` ? "Choosing..." : "Choose this bid"}
+                </Button>
+              )}
             </li>
           );
         })}
-        {!mine.length && <li className="text-sm text-zinc-500">Waiting for dealers to bid… share the QR code.</li>}
+        {!mine.length && <li className="text-base text-muted">Waiting for dealers to bid. Share the QR code.</li>}
       </ol>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-base text-alert">{error}</p>}
     </div>
   );
 }

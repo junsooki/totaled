@@ -1,5 +1,6 @@
 import base64
 import json
+import math
 import os
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -154,13 +155,18 @@ def page_image(cid: str, page: int, quote: Optional[str] = None):
 
 # --- 2. Audit ----------------------------------------------------------------
 
+def _failed_checks(rows) -> int:
+    """Number of distinct checks with at least one failed row."""
+    return len({r["check"] for r in rows if r["status"] == "fail"})
+
+
 @app.post("/api/claims/{cid}/audit")
 def audit(cid: str):
     data = _claim(cid)
     claim = Claim(**data["claim"])
     v = claim.vehicle
     checks = run_checks(claim)
-    failed = sum(1 for r in checks if r["status"] == "fail")
+    failed = _failed_checks(checks)
     live.agent(cid, "Appraiser", "working", f"Ran the 10 checks under 10 CCR § 2695.8: {failed} failed. "
                                             f"Pulling live {v.year} {v.make} {v.model} listings near {claim.owner_zip[:3]}xx")
     try:
@@ -177,7 +183,7 @@ def audit(cid: str):
     deadline = date.fromisoformat(claim.offer.offer_date) + timedelta(days=REOPEN_DAYS)
     result = {
         "checks": checks,
-        "failed": sum(1 for r in checks if r["status"] == "fail"),
+        "failed": failed,
         "recomputed_base": recomputed_base,
         "market": {"source": market["source"], "fetched_at": market["fetched_at"], "listings": matches, "fair_value": fv, "searched": len(market["listings"])},
         "counteroffer": co,
@@ -276,7 +282,56 @@ def payout(cid: str, body: PayoutRequest):
     return result
 
 
-# --- 5. Replace --------------------------------------------------------------
+# --- 5a. Rental --------------------------------------------------------------
+
+def _rental_options() -> list:
+    return json.loads((FIXTURES / "demo_rentals.json").read_text())["options"]
+
+
+class RentalRequest(BaseModel):
+    days: int = 14
+
+
+@app.post("/api/claims/{cid}/rentals")
+def rentals(cid: str, body: RentalRequest):
+    _claim(cid)
+    if not 1 <= body.days <= 90:
+        raise HTTPException(422, "Days must be between 1 and 90")
+    options = [dict(o, total=round(o["daily_rate"] * body.days, 2)) for o in _rental_options()]
+    db.log(cid, "rentals", {"days": body.days, "count": len(options)})
+    return {"days": body.days, "options": options, "source": "demo"}
+
+
+class RentalCheckout(BaseModel):
+    rental_id: str
+    days: int
+    deposit: float
+    spending_cap: float
+    consent: bool
+
+
+@app.post("/api/claims/{cid}/rental-checkout")
+def rental_checkout(cid: str, body: RentalCheckout):
+    """Simulated Visa hold for a rental car. No real payment is made."""
+    data = _claim(cid)
+    opt = next((o for o in _rental_options() if o["id"] == body.rental_id), None)
+    if not opt:
+        raise HTTPException(400, "Pick a rental from the options")
+    if not 1 <= body.days <= 90:
+        raise HTTPException(422, "Days must be between 1 and 90")
+    receipt = _simulated_receipt(
+        data, "purchase", body.deposit, body.spending_cap, body.consent,
+        "Refundable rental hold",
+        "A card hold, released when the car is returned. The rental cost is paid at the counter.",
+        rental={"agency": opt["agency"], "car_class": opt["car_class"], "example_car": opt["example_car"],
+                "daily_rate": opt["daily_rate"], "days": body.days,
+                "estimated_total": round(opt["daily_rate"] * body.days, 2)})
+    db.update(cid, rental=receipt)
+    db.log(cid, "rental_hold", {"rental_id": body.rental_id, "days": body.days, "amount": body.deposit, "simulated": True})
+    return receipt
+
+
+# --- 5b. Replace -------------------------------------------------------------
 
 @app.post("/api/claims/{cid}/replace")
 def replace(cid: str):
@@ -328,6 +383,38 @@ class Checkout(BaseModel):
     consent: bool
 
 
+def _simulated_receipt(data: dict, other_key: str, deposit: float, spending_cap: float, consent: bool,
+                       label: str, why: str, **extra) -> dict:
+    """Shared consent and spending-cap rules for the rental hold and the car deposit.
+    The cap covers both holds, so the other purchase's total counts against it."""
+    if not consent:
+        raise HTTPException(400, "The user must approve the charge on the consent screen")
+    if not (math.isfinite(deposit) and math.isfinite(spending_cap)):
+        raise HTTPException(400, "Deposit and spending cap must be real numbers")
+    if deposit <= 0:
+        raise HTTPException(400, "Deposit must be positive")
+    other = float((data.get(other_key) or {}).get("total") or 0)
+    if deposit + other > spending_cap:
+        if other:
+            raise HTTPException(400, f"Deposit ${deposit:,.2f} plus ${other:,.2f} already held is "
+                                     f"${deposit + other:,.2f}, over your spending cap ${spending_cap:,.2f}")
+        raise HTTPException(400, f"Deposit ${deposit:,.2f} is over your spending cap ${spending_cap:,.2f}")
+    return {
+        "id": "SIM-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+        "simulated": True,
+        "network": "Visa (simulated)",
+        **extra,
+        "lines": [
+            {"label": label, "amount": deposit, "why": why},
+            {"label": "Processing fee", "amount": 0.0, "why": "Simulated checkout: no fee is charged."},
+        ],
+        "total": deposit,
+        "spending_cap": spending_cap,
+        "remaining_under_cap": round(spending_cap - deposit - other, 2),
+        "at": db.now(),
+    }
+
+
 @app.post("/api/claims/{cid}/checkout")
 def checkout(cid: str, body: Checkout):
     """Simulated Visa checkout for a refundable hold deposit. No real payment is made."""
@@ -336,29 +423,17 @@ def checkout(cid: str, body: Checkout):
         raise HTTPException(400, "The user must approve the charge on the consent screen")
     if body.deposit <= 0:
         raise HTTPException(400, "Deposit must be positive")
-    if body.deposit > body.spending_cap:
-        raise HTTPException(400, f"Deposit ${body.deposit:,.2f} is over your spending cap ${body.spending_cap:,.2f}")
     car = next((l for l in (data.get("replace") or {}).get("shortlist", []) if l["vin"] == body.vin), None)
     win = data.get("auction_win")
     if not car and win and win["vin"] == body.vin:
         car = win
     if not car:
         raise HTTPException(400, "Pick a car from the shortlist or the auction")
-    receipt = {
-        "id": "SIM-" + datetime.now().strftime("%Y%m%d%H%M%S"),
-        "simulated": True,
-        "network": "Visa (simulated)",
-        "car": {k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")},
-        "lines": [
-            {"label": "Refundable hold deposit", "amount": body.deposit,
-             "why": "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't."},
-            {"label": "Processing fee", "amount": 0.0, "why": "Simulated checkout: no fee is charged."},
-        ],
-        "total": body.deposit,
-        "spending_cap": body.spending_cap,
-        "remaining_under_cap": round(body.spending_cap - body.deposit, 2),
-        "at": db.now(),
-    }
+    receipt = _simulated_receipt(
+        data, "rental", body.deposit, body.spending_cap, body.consent,
+        "Refundable hold deposit", "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't.",
+        car={k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")})
+
     db.update(cid, purchase=receipt)
     db.log(cid, "deposit", {"vin": body.vin, "amount": body.deposit, "simulated": True})
     return receipt
@@ -438,9 +513,10 @@ def results(cid: str):
     co = audit_.get("counteroffer")
     return {
         "dollars_at_stake": co["gap"] if co else None,
-        "checks_failed": audit_.get("failed"),
+        "checks_failed": _failed_checks(audit_["checks"]) if audit_.get("checks") else audit_.get("failed"),
         "minutes_to_letter": minutes,
         "letter_approved": bool(letter.get("approved_at")),
         "purchase": data.get("purchase"),
+        "rental": data.get("rental"),
         "events": db.events(cid),
     }

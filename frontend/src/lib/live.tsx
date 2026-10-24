@@ -37,7 +37,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         : null,
     [],
   );
-  if (!builder) return <p className="text-sm text-red-600">Live features are off: NEXT_PUBLIC_SPACETIME_DB is not set.</p>;
+  if (!builder) return <p className="text-sm text-alert">Live features are off: NEXT_PUBLIC_SPACETIME_DB is not set.</p>;
   return <SpacetimeDBProvider connectionBuilder={builder}>{children}</SpacetimeDBProvider>;
 }
 

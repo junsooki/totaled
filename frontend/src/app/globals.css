@@ -1,53 +1,57 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream: #f7f2e8;
+  --surface: #fffdf8;
+  --ink: #1f2a24;
+  --muted: #5e6a62;
+  --brand: #1f4d3a;
+  --brand-dark: #173b2c;
+  --brand-soft: #e4eee6;
+  --line: #e3dccb;
+  --alert: #b5472f;
+  --alert-soft: #f6e3dd;
+  --amber: #9a6a12;
+  --amber-soft: #f5e8cb;
+  --background: var(--cream);
+  --foreground: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-cream: var(--cream);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+  --color-line: var(--line);
+  --color-alert: var(--alert);
+  --color-alert-soft: var(--alert-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Chart role tokens (dataviz reference palette; validated against these surfaces) */
+/* Chart role tokens, tuned to the cream/green palette */
 .viz-root {
-  --viz-surface: var(--background);
-  --viz-text: #0b0b0b;
-  --viz-text-2: #52514e;
-  --viz-text-3: #8a8983;
-  --viz-grid: #e9e8e4;
-  --viz-total: #0b0b0b;
-  --viz-up: #2a78d6;
-  --viz-down: #e34948;
-  --viz-series-1: #2a78d6;
-  --viz-series-2: #eb6834;
-}
-@media (prefers-color-scheme: dark) {
-  .viz-root {
-    --viz-text: #f0efec;
-    --viz-text-2: #c3c2b7;
-    --viz-text-3: #8f8e86;
-    --viz-grid: #2a2a28;
-    --viz-total: #f0efec;
-    --viz-up: #3987e5;
-    --viz-down: #e66767;
-    --viz-series-1: #3987e5;
-    --viz-series-2: #d95926;
-  }
+  --viz-surface: var(--surface);
+  --viz-text: #1f2a24;
+  --viz-text-2: #4d5951;
+  --viz-text-3: #6f7a72;
+  --viz-grid: #e8e1d0;
+  --viz-total: #1f2a24;
+  --viz-up: #2f6b4f;
+  --viz-down: #b5472f;
+  --viz-series-1: #2f6b4f;
+  --viz-series-2: #c2603a;
 }

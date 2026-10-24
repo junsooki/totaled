@@ -4,6 +4,9 @@ import { useState } from "react";
 import { API, Json, put } from "@/lib/api";
 import { Badge, Button, inputCls } from "./ui";
 
+const fileBtn =
+  "inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold transition-colors focus-within:ring-2 focus-within:ring-brand focus-within:ring-offset-2 focus-within:ring-offset-cream";
+
 type Path = (string | number)[];
 
 function setIn(obj: Json, path: Path, value: Json): Json {
@@ -17,8 +20,8 @@ const VEHICLE: [string, string][] = [
   ["year", "Year"], ["make", "Make"], ["model", "Model"], ["trim", "Trim"], ["vin", "VIN"], ["mileage", "Mileage"],
 ];
 const OFFER: [string, string][] = [
-  ["offer_date", "Offer date"], ["base_value", "Base value"], ["condition_adjustment", "Condition adj."],
-  ["sales_tax", "Sales tax"], ["title_fees", "Title/fees"], ["registration_prorated", "Prorated registration"],
+  ["offer_date", "Offer date"], ["base_value", "Base value"], ["condition_adjustment", "Condition adjustment"],
+  ["sales_tax", "Sales tax"], ["title_fees", "Title and fees"], ["registration_prorated", "Prorated registration"],
   ["deductible", "Deductible"], ["total", "Total offer"],
 ];
 const COMP: [string, string][] = [
@@ -31,6 +34,8 @@ const NUMERIC = new Set(["year", "mileage", "base_value", "condition_adjustment"
 export default function Upload({ onConfirmed }: { onConfirmed: (id: string, claim: Json) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<"add" | "check">("add");
+  const [dragging, setDragging] = useState(false);
   const [draft, setDraft] = useState<{ id: string; claim: Json; by: string } | null>(null);
 
   async function start(files?: FileList | null) {
@@ -43,6 +48,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? res.statusText);
       setDraft({ id: body.id, claim: body.claim, by: body.extracted_by });
+      setStage("check");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -66,6 +72,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
 
   // VIN: decode with NHTSA (free) or scan a photo; fill empty fields, flag disagreements with the report.
   const [vinNote, setVinNote] = useState<string | null>(null);
+  const [vinIssues, setVinIssues] = useState<string[]>([]);
   const [vinBusy, setVinBusy] = useState(false);
 
   function applyVin(d: Json) {
@@ -88,25 +95,25 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       filled.push("mileage");
     }
     setDraft({ ...draft, claim });
+    setVinIssues([...differs, ...(d.warning ? [String(d.warning)] : [])]);
     setVinNote(
       [`VIN ${d.vin}: ${[d.year, d.make, d.model, d.trim].filter(Boolean).join(" ")}`,
         filled.length ? `filled ${filled.join(", ")}` : "",
-        differs.length ? `check: ${differs.join("; ")}` : "",
-        d.odometer != null ? `odometer in photo: ${d.odometer.toLocaleString()} mi` : "",
-        d.warning ?? ""].filter(Boolean).join(" · "),
+        d.odometer != null ? `odometer in photo: ${d.odometer.toLocaleString()} mi` : ""].filter(Boolean).join(" · "),
     );
   }
 
   async function vinRequest(req: Promise<Response>) {
     setVinBusy(true);
     setVinNote(null);
+    setVinIssues([]);
     try {
       const res = await req;
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? res.statusText);
       applyVin(body);
     } catch (e) {
-      setVinNote(e instanceof Error ? e.message : String(e));
+      setVinIssues([e instanceof Error ? e.message : String(e)]);
     } finally {
       setVinBusy(false);
     }
@@ -134,89 +141,154 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       />
     );
   };
+  const labeled = (label: string, path: Path, key: string) => (
+    <label key={path.join(".")} className="block text-sm font-medium text-ink">
+      <span className="mb-1 block">{label}</span>
+      {field(path, key)}
+    </label>
+  );
 
-  if (!draft) {
-    return (
-      <div className="rounded border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-        <p className="text-sm text-zinc-500">
-          Add the insurer&apos;s valuation report and offer letter: one PDF, or a photo of each page. We fill in the fields for you.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-          <label className="cursor-pointer rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-zinc-900">
-            {busy ? "Reading report…" : "Take photos"}
-            <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={busy}
-              onChange={(e) => e.target.files?.length && start(e.target.files)} />
-          </label>
-          <label className="cursor-pointer rounded border border-zinc-300 px-4 py-2 text-sm font-medium dark:border-zinc-700">
-            Upload PDF or photos
-            <input type="file" accept="application/pdf,image/*" multiple className="hidden" disabled={busy}
-              onChange={(e) => e.target.files?.length && start(e.target.files)} />
-          </label>
-          <Button variant="secondary" disabled={busy} onClick={() => start()}>Use the sample report</Button>
+  // Stage 1: add the report.
+  if (stage === "add" || !draft) {
+    if (busy) {
+      return (
+        <div role="status" aria-live="polite" className="rounded-3xl bg-brand-soft px-6 py-14 text-center">
+          <div className="mx-auto size-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden="true" />
+          <p className="mt-6 font-serif text-2xl font-semibold text-ink">Reading your report…</p>
+          <p className="mx-auto mt-2 max-w-md text-base text-muted">
+            This can take a minute. We are pulling out your car, the offer and the comparable cars. You can check it all next.
+          </p>
+          <div className="mx-auto mt-6 h-1.5 max-w-xs overflow-hidden rounded-full bg-brand/15" aria-hidden="true">
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-brand" />
+          </div>
         </div>
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      );
+    }
+    return (
+      <div className="space-y-6">
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files.length) start(e.dataTransfer.files);
+          }}
+          className={`rounded-3xl border-2 border-dashed px-6 py-14 text-center transition-colors ${dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-cream"}`}
+        >
+          <svg viewBox="0 0 24 24" className="mx-auto size-12 text-brand" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-4 font-serif text-2xl font-semibold text-ink">Drop your valuation report here</p>
+          <p className="mx-auto mt-2 max-w-md text-base text-muted">
+            One PDF works best. A photo of each page works too.
+          </p>
+          <div className="mt-6">
+            <label className={`${fileBtn} bg-brand text-white shadow-sm hover:bg-brand-dark`}>
+              Choose a PDF or photos
+              <input type="file" accept="application/pdf,image/*" multiple className="sr-only"
+                onChange={(e) => {
+                  if (e.target.files?.length) start(e.target.files);
+                  e.target.value = "";
+                }} />
+            </label>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className={`${fileBtn} bg-surface text-brand ring-1 ring-inset ring-brand/40 hover:bg-brand-soft`}>
+            Take photos with your camera
+            <input type="file" accept="image/*" capture="environment" multiple className="sr-only"
+              onChange={(e) => {
+                if (e.target.files?.length) start(e.target.files);
+                e.target.value = "";
+              }} />
+          </label>
+          <Button variant="secondary" onClick={() => start()}>Try the sample report</Button>
+        </div>
+        {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}
+        {draft && (
+          <div>
+            <Button onClick={() => setStage("check")}>Keep what we already read</Button>
+          </div>
+        )}
       </div>
     );
   }
 
+  // Stage 2: check what we read.
   const c = draft.claim;
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-zinc-500">
-        Read by <Badge>{draft.by}</Badge>. Check every field against your report and fix anything misread.
+    <div className="space-y-10">
+      <p className="text-base text-muted">
+        We read your report using <Badge>{draft.by}</Badge>. Fix anything that looks wrong, then confirm.
       </p>
-      <div>
-        <h3 className="mb-2 font-medium">Your car</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+
+      <section>
+        <h2 className="font-serif text-2xl font-semibold text-ink">Your car</h2>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {VEHICLE.map(([k, label]) => (
-            <label key={k} className="text-xs text-zinc-500">{label}{field(["vehicle", k], k)}</label>
+            <div key={k} className={k === "vin" ? "col-span-2" : ""}>
+              {labeled(label, ["vehicle", k], k)}
+              {k === "vin" && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <button type="button" className="cursor-pointer font-semibold text-brand underline underline-offset-2 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                    disabled={vinBusy || (c.vehicle.vin ?? "").length !== 17} onClick={() => decodeVin(c.vehicle.vin)}>
+                    {vinBusy ? "Checking…" : "Look up this VIN"}
+                  </button>
+                  <label className="cursor-pointer font-semibold text-brand underline underline-offset-2 hover:text-brand-dark focus-within:ring-2 focus-within:ring-brand">
+                    Scan it from a photo
+                    <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={vinBusy}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) scanVin(f);
+                      }} />
+                  </label>
+                </div>
+              )}
+            </div>
           ))}
-          <label className="text-xs text-zinc-500">Your ZIP{field(["owner_zip"], "owner_zip")}</label>
+          <div className="col-span-2 sm:col-span-1">{labeled("Your ZIP", ["owner_zip"], "owner_zip")}</div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <label className="cursor-pointer rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700">
-            {vinBusy ? "Reading…" : "Scan VIN (photo)"}
-            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={vinBusy}
-              onChange={(e) => e.target.files?.[0] && scanVin(e.target.files[0])} />
-          </label>
-          <button className="rounded border border-zinc-300 px-2 py-1 disabled:opacity-50 dark:border-zinc-700"
-            disabled={vinBusy || (c.vehicle.vin ?? "").length !== 17} onClick={() => decodeVin(c.vehicle.vin)}>
-            Decode VIN
-          </button>
-          <span className="text-zinc-500">{vinNote ?? "Door-jamb sticker, dashboard plate or registration card."}</span>
+        <div className="mt-2 space-y-1 text-sm" aria-live="polite">
+          <p className="text-muted">{vinNote ?? "The VIN is on the door-jamb sticker, the dashboard plate or your registration card."}</p>
+          {vinIssues.map((m, i) => <p key={i} className="font-medium text-alert">Please check: {m}</p>)}
         </div>
-      </div>
-      <div>
-        <h3 className="mb-2 font-medium">Offer</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {OFFER.map(([k, label]) => (
-            <label key={k} className="text-xs text-zinc-500">{label}{field(["offer", k], k)}</label>
+      </section>
+
+      <section>
+        <h2 className="font-serif text-2xl font-semibold text-ink">The insurer&apos;s offer</h2>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {OFFER.map(([k, label]) => labeled(label, ["offer", k], k))}
+          {labeled("Condition deduction", ["condition", "deduction"], "deduction")}
+          {labeled("Condition grade", ["condition", "subject_grade"], "subject_grade")}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="font-serif text-2xl font-semibold text-ink">Cars the insurer compared</h2>
+        <div className="mt-4 divide-y divide-line">
+          {c.comparables.map((comp: Json, i: number) => (
+            <div key={comp.id ?? i} className="py-6 first:pt-0 last:pb-0">
+              <h3 className="text-lg font-semibold text-ink">Comparable {comp.id}</h3>
+              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {COMP.map(([k, label]) => labeled(label, ["comparables", i, k], k))}
+              </div>
+              {comp.adjustments?.length > 0 && (
+                <p className="mt-3 text-sm text-muted">
+                  Adjustments: {comp.adjustments.map((a: Json) => `${a.label} ${a.amount >= 0 ? "+" : ""}${a.amount}`).join(", ")}
+                </p>
+              )}
+            </div>
           ))}
-          <label className="text-xs text-zinc-500">Condition deduction{field(["condition", "deduction"], "deduction")}</label>
-          <label className="text-xs text-zinc-500">Condition grade{field(["condition", "subject_grade"], "subject_grade")}</label>
         </div>
+      </section>
+
+      {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}
+      <div className="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="secondary" onClick={() => setStage("add")} disabled={busy}>Back</Button>
+        <Button onClick={confirm} disabled={busy}>{busy ? "Saving…" : "These look right"}</Button>
       </div>
-      <div className="overflow-x-auto">
-        <h3 className="mb-2 font-medium">Insurer&apos;s comparables</h3>
-        <table className="w-full min-w-[900px] text-left text-xs">
-          <thead className="text-zinc-500">
-            <tr><th className="pr-2">#</th>{COMP.map(([k, l]) => <th key={k} className="pr-2">{l}</th>)}<th>Adjustments</th></tr>
-          </thead>
-          <tbody>
-            {c.comparables.map((comp: Json, i: number) => (
-              <tr key={comp.id} className="align-top">
-                <td className="py-1 pr-2 font-medium">{comp.id}</td>
-                {COMP.map(([k]) => <td key={k} className="py-1 pr-2">{field(["comparables", i, k], k)}</td>)}
-                <td className="py-1 text-zinc-500">
-                  {comp.adjustments.map((a: Json) => `${a.label} ${a.amount >= 0 ? "+" : ""}${a.amount}`).join(", ")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button onClick={confirm} disabled={busy}>{busy ? "Saving…" : "These fields are correct"}</Button>
     </div>
   );
 }
