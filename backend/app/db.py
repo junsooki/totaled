@@ -32,8 +32,10 @@ def _init():
     conn.execute("CREATE TABLE IF NOT EXISTS events (claim_id TEXT NOT NULL, at TEXT NOT NULL, kind TEXT NOT NULL, "
                  "detail TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS market_cache (key TEXT PRIMARY KEY, at TEXT NOT NULL, data TEXT NOT NULL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS agent_steps (claim_id TEXT NOT NULL, at TEXT NOT NULL, agent TEXT NOT NULL, "
+                 "status TEXT NOT NULL, text TEXT NOT NULL)")
     if DATABASE_URL:  # Supabase exposes public tables over its REST API; RLS with no policies blocks that
-        for t in ("claims", "events", "market_cache"):
+        for t in ("claims", "events", "market_cache", "agent_steps"):
             conn.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
     conn.close()
 
@@ -130,6 +132,22 @@ def events(cid: str) -> list:
     return [{"at": a, "kind": k, "detail": json.loads(d)} for a, k, d in rows]
 
 
+def step(cid: str, agent: str, status: str, text: str, at: str = None):
+    """One step of an agent's work, shown to the user as it happens: status is working | done | error."""
+    conn, p = _connect()
+    conn.execute(f"INSERT INTO agent_steps (claim_id, at, agent, status, text) VALUES ({p}, {p}, {p}, {p}, {p})",
+                 (cid, at or now(), agent, status, text))
+    conn.close()
+
+
+def steps(cid: str) -> list:
+    conn, p = _connect()
+    rows = conn.execute(f"SELECT at, agent, status, text FROM agent_steps WHERE claim_id = {p} ORDER BY at",
+                        (cid,)).fetchall()
+    conn.close()
+    return [{"at": a, "agent": g, "status": st, "text": t} for a, g, st, t in rows]
+
+
 def cache_get(key: str):
     """Last saved market search for this key: (saved_at ISO string, listings) or None."""
     conn, p = _connect()
@@ -155,6 +173,7 @@ def prune_expired_claims() -> int:
         rows = conn.execute(f"SELECT id FROM claims WHERE created_at < {p}", (cutoff,)).fetchall()
         for (cid,) in rows:
             conn.execute(f"DELETE FROM events WHERE claim_id = {p}", (cid,))
+            conn.execute(f"DELETE FROM agent_steps WHERE claim_id = {p}", (cid,))
             conn.execute(f"DELETE FROM claims WHERE id = {p}", (cid,))
         conn.commit()
         return len(rows)

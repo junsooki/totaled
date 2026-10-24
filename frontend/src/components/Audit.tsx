@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { API, Json, usd } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { fileUrl, Json, usd } from "@/lib/api";
 import { Badge, Notice, Stat, SummaryList } from "./ui";
 import { Bridge, Market } from "./ValueCharts";
 import VoiceAssistant from "./VoiceAssistant";
@@ -70,10 +70,16 @@ function Tabs({ panels }: { panels: Record<(typeof TABS)[number]["id"], React.Re
   );
 }
 
-function ReportLine({ src, alt }: { src: string; alt: string }) {
+function ReportLine({ path, alt }: { path: string; alt: string }) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
-  const url = attempt ? `${src}${src.includes("?") ? "&" : "?"}retry=${attempt}` : src;
+  const [url, setUrl] = useState<string | null>(null);
+  // Fetched with the claim token (a plain <img src> can't send it), then shown from an object URL.
+  useEffect(() => {
+    let made: string | null = null;
+    fileUrl(path).then((u) => { made = u; setUrl(u); }).catch(() => setState("error"));
+    return () => { if (made) URL.revokeObjectURL(made); };
+  }, [path, attempt]);
   return (
     <div>
       {state === "loading" && <p className="text-base text-muted">Loading the report line…</p>}
@@ -88,7 +94,7 @@ function ReportLine({ src, alt }: { src: string; alt: string }) {
             Try again
           </button>
         </p>
-      ) : (
+      ) : url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={attempt}
@@ -191,7 +197,7 @@ export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: 
                   {r.source && shown === key && (
                     <ReportLine
                       alt={`Report page ${r.source.page}, with the line highlighted`}
-                      src={`${API}/api/claims/${id}/page/${r.source.page}.png?quote=${encodeURIComponent(r.source.quote)}`}
+                      path={`/api/claims/${id}/page/${r.source.page}.png?quote=${encodeURIComponent(r.source.quote)}`}
                     />
                   )}
                 </div>
@@ -244,13 +250,19 @@ export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: 
       <Market listings={audit.market.listings} fair={fv} mileage={claim.vehicle.mileage} insurer={audit.insurer_comps ?? []} />
       {audit.market.listings.length > 0 && (
         <div>
-          <h4 className="border-t-2 border-rule pt-3 text-xl">Live listings behind the estimate</h4>
+          <h4 className="border-t-2 border-rule pt-3 text-xl">Listings behind the estimate</h4>
           <ul className="mt-2 text-base text-muted">
-            {audit.market.listings.slice(0, 5).map((l: Json) => (
-              <li key={l.vin} className="border-t border-line py-2 first:border-t-0">
-                {l.url ? <a className="text-brand underline underline-offset-2" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
-                  : `${l.year} ${l.make} ${l.model} ${l.trim}`}
-                {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
+            {audit.market.listings.map((l: Json) => (
+              <li key={l.vin} className="flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line py-2 first:border-t-0">
+                <span>
+                  {l.url ? <a className="text-brand underline underline-offset-2" href={l.url} target="_blank" rel="noreferrer">{l.year} {l.make} {l.model} {l.trim}</a>
+                    : `${l.year} ${l.make} ${l.model} ${l.trim}`}
+                  {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
+                </span>
+                <span className="flex items-center gap-2 text-sm">
+                  {l.source === "demo" ? "Saved demo listing" : `CarGurus via Apify${audit.market.fetched_at ? `, fetched ${new Date(audit.market.fetched_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}`}
+                  <Badge tone={audit.market.source === "live" ? "green" : "amber"}>{audit.market.source === "live" ? "live" : audit.market.source === "cached" ? "saved" : "demo"}</Badge>
+                </span>
               </li>
             ))}
           </ul>
