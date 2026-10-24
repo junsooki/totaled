@@ -25,6 +25,14 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
 - Visa: simulated checkout, labeled as such. Covers the rental hold and the car deposit; one spending cap applies to both.
 
+## Demo cache
+
+`backend/app/fixtures/demo_cache.json` holds saved results of real runs: the sample report read by Claude, the Apify searches for a 2019 Civic (blank ZIP and 94704), both letters, and the CRS sandbox results for all 20 personas.
+A saved result replaces a paid call only when the same input recurs and that integration is configured. Anything new still runs live.
+The UI then shows "claude (saved demo run)", the original Apify fetch time, and "Saved data" for CRS.
+`DEMO_CACHE=0` turns it off.
+Rebuild it from the local database with `cd backend && python scripts/build_demo_cache.py --fetch-missing --fetch-crs`. The flags make paid Apify and CRS sandbox calls.
+
 ## Real-time core (SpacetimeDB)
 
 `spacetime/` is a SpacetimeDB module (TypeScript) published to Maincloud as `totaled-live`. It is the live shared state for three things:

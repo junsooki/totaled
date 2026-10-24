@@ -8,7 +8,7 @@ from typing import List
 
 from apify_client import ApifyClient
 
-from . import db
+from . import db, demo_cache
 
 CARGURUS_ACTOR = "e-commerce/cargurus-zipcode-search-scraper"
 ROOT = Path(__file__).resolve().parent
@@ -66,6 +66,19 @@ def _dedupe(listings: List[dict]) -> List[dict]:
     return out
 
 
+def run_input_and_key(make: str, model: str, year_from: int, year_to: int, zip_code: str, radius: int):
+    run_input = {
+        "zips": [zip_code],
+        "carBrands": [make],
+        "carModels": [model],
+        "yearFrom": year_from,
+        "yearTo": year_to,
+        "radius": _radius_label(radius),
+    }
+    key = hashlib.sha1(json.dumps(run_input, sort_keys=True).encode()).hexdigest()[:12]
+    return run_input, key
+
+
 def search(make: str, model: str, year_from: int, year_to: int, zip_code: str, radius: int) -> dict:
     """Run the CarGurus Actor, reusing a recent run of the same search to save Apify credit.
 
@@ -77,15 +90,10 @@ def search(make: str, model: str, year_from: int, year_to: int, zip_code: str, r
                     and year_from <= l["year"] <= year_to]
         return {"listings": listings, "source": "demo", "fetched_at": None}
 
-    run_input = {
-        "zips": [zip_code],
-        "carBrands": [make],
-        "carModels": [model],
-        "yearFrom": year_from,
-        "yearTo": year_to,
-        "radius": _radius_label(radius),
-    }
-    key = hashlib.sha1(json.dumps(run_input, sort_keys=True).encode()).hexdigest()[:12]
+    run_input, key = run_input_and_key(make, model, year_from, year_to, zip_code, radius)
+    saved = demo_cache.market(key)  # a saved real run of this exact search
+    if saved:
+        return {"listings": saved["listings"], "source": "cached", "fetched_at": saved["at"]}
     cached = db.cache_get(key)
     if cached and datetime.now(timezone.utc) - datetime.fromisoformat(cached[0]) < timedelta(hours=CACHE_HOURS):
         return {"listings": cached[1], "source": "cached", "fetched_at": cached[0]}

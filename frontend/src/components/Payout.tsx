@@ -128,7 +128,7 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
                 {result.credit.name}: score {result.credit.score ?? "none"} ({result.credit.score_model ?? "n/a"}),{" "}
                 {result.credit.auto_loans.length} open auto loan(s).
               </span>
-              <Badge tone={result.credit.source === "demo" ? "amber" : "green"}>{result.credit.source === "demo" ? "Demo data" : "Live data"}</Badge>
+              <Badge tone={result.credit.source === "demo" ? "amber" : result.credit.source === "cached" ? "zinc" : "green"}>{result.credit.source === "demo" ? "Demo data" : result.credit.source === "cached" ? "Saved data" : "Live data"}</Badge>
             </p>
             {result.credit.errors.length > 0 && (
               <p className="mt-1 text-sm text-alert">Credit report issues: {result.credit.errors.join("; ")}</p>

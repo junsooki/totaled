@@ -11,6 +11,8 @@ from typing import Optional
 
 import requests
 
+from . import demo_cache
+
 BASE = "https://api-sandbox.stitchcredit.com/api"
 PERSONAS = json.loads((Path(__file__).resolve().parent / "fixtures" / "crs_personas.json").read_text())["personas"]
 AUTO_LOAN_TYPES = {"Automobile", "AutoRefinance", "AutoLoanEquityTransfer", "AutoLease"}
@@ -83,6 +85,10 @@ def credit_summary(pid: str, demo: bool) -> dict:
         return {"persona": pid, "name": p["name"], "score": score, "score_model": "VantageScore 4.0 (demo)",
                 "auto_loans": loans, "errors": [], "file_status": "FileReturned", "source": "demo"}
 
+    saved = demo_cache.credit(pid)  # a saved sandbox run for this persona
+    if saved:
+        return dict(saved, source="cached")
+
     report = _post("/experian/credit-report/standard/exp-prequal-vantage4", p["credit_body"])
     errors = [e.get("creditErrorMessageText") for e in (report.get("errorMessages") or [])]
     files = report.get("creditFiles") or []
@@ -144,6 +150,10 @@ def seller_check(pid: str, demo: bool) -> dict:
         records = 0 if blj.strip() == "0/0/0" else 1
         return {"persona": pid, "name": p["name"], "identity": idv, "identity_detail": idv_text,
                 "records": records, "records_detail": blj, "verdict": _verdict(idv, records), "source": "demo"}
+
+    saved = demo_cache.seller(pid)
+    if saved:
+        return dict(saved, source="cached")
 
     sr = _post("/transunion/identity-manager-verification/basic", p["idv_body"])
     msgs = (((sr.get("addOnProducts") or [{}])[0].get("idManagerVerification") or {}).get("messages")) or []

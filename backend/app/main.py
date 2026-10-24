@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from . import ai, comps, crs, db, live  # noqa: E402
+from . import ai, comps, crs, db, demo_cache, live  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -81,10 +81,14 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
 
     if ai.available():
-        try:
-            claim, by = ai.extract_claim(pdf).model_dump(), "claude"
-        except Exception as e:
-            raise HTTPException(502, f"Claude could not read the report: {e}")
+        saved = demo_cache.extraction(pdf)
+        if saved:
+            claim, by = saved, "claude (saved demo run)"
+        else:
+            try:
+                claim, by = ai.extract_claim(pdf).model_dump(), "claude"
+            except Exception as e:
+                raise HTTPException(502, f"Claude could not read the report: {e}")
     elif sample:
         claim, by = json.loads((FIXTURES / "sample_claim.json").read_text()), "sample fixture (Claude not configured)"
     else:
@@ -214,10 +218,14 @@ def draft(cid: str):
     evidence = build_evidence(claim, data["audit"])
     live.agent(cid, "Negotiator", "working", f"Drafting the counteroffer from {len(evidence)} pieces of evidence")
     if ai.available():
-        try:
-            letter, by = ai.draft_letter(evidence), "claude"
-        except Exception as e:
-            raise HTTPException(502, f"Claude could not draft the letter: {e}")
+        saved = demo_cache.letter(evidence)
+        if saved:
+            letter, by = ai.Letter(**saved), "claude (saved demo run)"
+        else:
+            try:
+                letter, by = ai.draft_letter(evidence), "claude"
+            except Exception as e:
+                raise HTTPException(502, f"Claude could not draft the letter: {e}")
     else:
         letter, by = template_letter(claim, evidence), "template (Claude not configured)"
     sentences = ai.citation_check(letter, evidence)
