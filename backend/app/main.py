@@ -42,12 +42,10 @@ def _claim(cid: str) -> dict:
 
 @app.get("/api/status")
 def status():
-    demo = comps.demo_mode()
     return {
-        "demo": demo,
-        "apify": "demo" if demo else ("live" if os.environ.get("APIFY_TOKEN") else "missing"),
+        "apify": "demo" if comps.demo_mode() else ("live" if os.environ.get("APIFY_TOKEN") else "missing"),
         "claude": "live" if ai.available() else "missing",
-        "crs": "demo" if demo else ("live" if crs.available() else "missing"),
+        "crs": "demo" if crs.demo_mode() else ("live" if crs.available() else "missing"),
         "database": "postgres" if db.DATABASE_URL else "sqlite",
         "checks": [{"check": n, "name": name, "rule": sec} for n, name, sec in CHECKS],
         "personas": [{k: p[k] for k in ("id", "name", "profile", "decision")} for p in crs.PERSONAS],
@@ -233,7 +231,7 @@ class PayoutRequest(BaseModel):
 
 
 def _require_crs():
-    if not comps.demo_mode() and not crs.available():
+    if not crs.demo_mode() and not crs.available():
         raise HTTPException(503, "CRS sandbox credentials missing: set CRS_USERNAME and CRS_PASSWORD (or DEMO_MODE=1)")
 
 
@@ -243,7 +241,7 @@ def payout(cid: str, body: PayoutRequest):
     _require_crs()
     claim = Claim(**data["claim"])
     try:
-        credit = crs.credit_summary(body.persona, comps.demo_mode())
+        credit = crs.credit_summary(body.persona, crs.demo_mode())
     except Exception as e:
         raise HTTPException(502, f"CRS credit report failed: {e}")
     co = (data.get("audit") or {}).get("counteroffer")
@@ -293,7 +291,7 @@ def seller_check(cid: str, body: SellerCheck):
     _claim(cid)
     _require_crs()
     try:
-        result = crs.seller_check(body.persona, comps.demo_mode())
+        result = crs.seller_check(body.persona, crs.demo_mode())
     except Exception as e:
         raise HTTPException(502, f"CRS seller check failed: {e}")
     result["vin"] = body.vin

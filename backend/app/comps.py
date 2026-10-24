@@ -14,10 +14,12 @@ DEMO_LISTINGS = ROOT / "fixtures" / "demo_listings.json"
 
 # The CarGurus Actor only accepts these radius values.
 RADIUS_OPTIONS = [10, 25, 50, 75, 100, 150, 200, 500]
+MAX_CHARGE_USD = float(os.environ.get("APIFY_MAX_CHARGE_USD", "0.5"))  # per run; the free plan has $5/month
 
 
 def demo_mode() -> bool:
-    return os.environ.get("DEMO_MODE") == "1"
+    """Demo data only for integrations without credentials: a key, once set, always wins."""
+    return os.environ.get("DEMO_MODE") == "1" and not os.environ.get("APIFY_TOKEN")
 
 
 def _radius_label(miles: int) -> str:
@@ -85,7 +87,7 @@ def search(make: str, model: str, year_from: int, year_to: int, zip_code: str, r
 
     try:
         client = ApifyClient(os.environ["APIFY_TOKEN"])
-        run = client.actor(CARGURUS_ACTOR).call(run_input=run_input)
+        run = client.actor(CARGURUS_ACTOR).call(run_input=run_input, max_total_charge_usd=MAX_CHARGE_USD, logger=None)
         items = client.dataset(run["defaultDatasetId"]).list_items().items
         listings = _dedupe([_normalize(i) for i in items])
         CACHE_DIR.mkdir(parents=True, exist_ok=True)

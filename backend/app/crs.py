@@ -22,6 +22,10 @@ def available() -> bool:
     return bool(os.environ.get("CRS_USERNAME") and os.environ.get("CRS_PASSWORD"))
 
 
+def demo_mode() -> bool:
+    return os.environ.get("DEMO_MODE") == "1" and not available()
+
+
 def persona(pid: str) -> dict:
     for p in PERSONAS:
         if p["id"] == pid:

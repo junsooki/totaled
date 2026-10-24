@@ -28,6 +28,14 @@ CHECKS = [
 ]
 
 
+DRIVETRAINS = {"fwd", "awd", "rwd", "4wd", "2wd", "4x4"}
+
+
+def norm_trim(trim: Optional[str]) -> str:
+    """'EX FWD' and 'ex' compare equal; 'EX-L' stays different from 'EX'."""
+    return " ".join(w for w in (trim or "").lower().split() if w not in DRIVETRAINS)
+
+
 def _days_between(a: str, b: str) -> int:
     return (date.fromisoformat(b) - date.fromisoformat(a)).days
 
@@ -80,7 +88,7 @@ def check_comparable(claim: Claim, c: Comparable) -> List[dict]:
     out.append(_result(4, not missing, "; ".join(missing) or "Identified with seller contact", c))
 
     diffs = []
-    if v.trim and c.trim and c.trim.lower() != v.trim.lower():
+    if v.trim and c.trim and norm_trim(c.trim) != norm_trim(v.trim):
         diffs.append(f"trim {c.trim} vs {v.trim}")
     if c.odometer is not None and abs(c.odometer - v.mileage) > MILEAGE_TOLERANCE * v.mileage:
         diffs.append(f"{c.odometer:,} mi vs {v.mileage:,} mi")

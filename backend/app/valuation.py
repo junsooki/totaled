@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 
+from .checks import norm_trim
 from .schemas import Claim, Vehicle
 
 
@@ -16,7 +17,7 @@ def comparable_listings(listings: List[dict], v: Vehicle) -> List[dict]:
             continue
         if l["year"] != v.year:
             continue
-        if v.trim and l.get("trim") and l["trim"].lower() != v.trim.lower():
+        if v.trim and l.get("trim") and norm_trim(l["trim"]) != norm_trim(v.trim):
             continue
         out.append(l)
     return out
