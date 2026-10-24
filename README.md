@@ -20,7 +20,7 @@ The results card shows dollars at stake, checks failed and minutes from upload t
 
 Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CRS return clearly labeled demo data so the whole flow can run without keys. Without `ANTHROPIC_API_KEY`, the sample report uses its known fields and the letter is a code template. The UI shows which mode each integration is in.
 
-- Apify: `e-commerce/cargurus-zipcode-search-scraper`; each run is cached and reused if a later run fails.
+- Apify: `e-commerce/cargurus-zipcode-search-scraper`; each search is saved in the database and reused for `MARKET_CACHE_HOURS` (24 on prod), capped at $0.50 per run.
 - CRS: sandbox REST API, test personas only (`backend/app/fixtures/crs_personas.json`), never real credit data.
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
 - Visa: simulated checkout, labeled as such.
