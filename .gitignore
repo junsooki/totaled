@@ -1,0 +1,14 @@
+# secrets
+.env
+.mcp.json
+
+# python
+.venv/
+__pycache__/
+backend/data/cache/
+
+# node
+node_modules/
+.next/
+
+.DS_Store
