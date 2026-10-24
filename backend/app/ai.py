@@ -1,5 +1,6 @@
 """Claude reads the report and drafts the letter. It never computes a dollar amount."""
 import base64
+import json
 import os
 import re
 from typing import List, Optional
@@ -20,7 +21,7 @@ def available() -> bool:
 
 EXTRACT_PROMPT = """This is an insurer's total loss valuation report and offer letter for a car in California,
 either as a PDF or as phone photos of the pages (one photo per page; read them even if tilted or shadowed).
-Extract the claim into the schema. Rules:
+Extract the claim as JSON. Rules:
 - Copy numbers exactly as printed. Do not compute, round or fill in anything that is not printed.
 - Leave a field null when the report does not state it (for example a missing VIN or seller contact).
 - Adjustments are signed: amounts that lower the comparable's value are negative.
@@ -28,29 +29,47 @@ Extract the claim into the schema. Rules:
   inspection notes or photos support a below-average grade.
 - offer.written_explanation is true if the letter explains how the value was calculated.
 - For every comparable, the condition and the offer, set source.page (1-indexed) and source.quote to one
-  line copied verbatim from that page that identifies it, so it can be highlighted."""
+  line copied verbatim from that page that identifies it, so it can be highlighted.
+
+Reply with ONLY one JSON object that matches this JSON Schema, no prose, no code fences. Fields the report
+does not print are null.
+{schema}"""
 
 
 def extract_claim(pdf: bytes) -> Claim:
+    """The Claim schema is too large for constrained decoding, so ask for JSON and validate it ourselves."""
     client = anthropic.Anthropic()
-    response = client.beta.messages.parse(
-        model=MODEL,
-        max_tokens=16000,
-        output_config={"effort": "medium"},
-        output_format=Claim,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
-                                                "data": base64.b64encode(pdf).decode()}},
-                {"type": "text", "text": EXTRACT_PROMPT},
-            ],
-        }],
-        **FALLBACK,
-    )
-    if response.stop_reason == "refusal" or response.parsed_output is None:
-        raise RuntimeError(f"Claude could not read the report (stop_reason={response.stop_reason})")
-    return response.parsed_output
+    schema = json.dumps(Claim.model_json_schema(), separators=(",", ":"))
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                            "data": base64.b64encode(pdf).decode()}},
+            {"type": "text", "text": EXTRACT_PROMPT.replace("{schema}", schema)},
+        ],
+    }]
+    error = None
+    for attempt in range(2):
+        response = client.beta.messages.create(
+            model=MODEL,
+            max_tokens=16000,
+            output_config={"effort": "medium"},
+            messages=messages,
+            **FALLBACK,
+        )
+        if response.stop_reason == "refusal":
+            raise RuntimeError(f"Claude could not read the report (stop_reason={response.stop_reason})")
+        text = "".join(b.text for b in response.content if b.type == "text").strip()
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+        try:
+            return Claim.model_validate_json(text)
+        except ValueError as e:  # pydantic's ValidationError is a ValueError
+            error = e
+            messages = messages + [
+                {"role": "assistant", "content": text},
+                {"role": "user", "content": f"That JSON was invalid:\n{e}\nReply with ONLY the corrected JSON object."},
+            ]
+    raise RuntimeError(f"Claude could not read the report (invalid JSON: {str(error)[:200]})")
 
 
 class VinPhoto(BaseModel):
