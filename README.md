@@ -9,12 +9,14 @@ Rule for the whole system: the AI reads and writes, code computes every dollar, 
 | # | Screen | What happens | Code |
 |---|---|---|---|
 | 1 | Upload | Claude reads the report PDF into structured fields, including the insurer, claim and policy numbers and the policyholder name for the letter; the user confirms each one and can add an optional note about what happened | `backend/app/ai.py`, `frontend/src/components/Upload.tsx` |
-| 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate), gap in dollars, 35-day deadline | `backend/app/checks.py`, `valuation.py`, `comps.py` |
+| 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate), gap in dollars, 35-day deadline, voice claim guide | `backend/app/checks.py`, `valuation.py`, `comps.py`, `VoiceAssistant.tsx` |
 | 3 | Counteroffer | Claude drafts the letter; every sentence cites evidence; code rejects any dollar amount not in the evidence; user edits then approves; the approved letter can be copied or downloaded as a PDF | `backend/app/letter.py`, `ai.py` |
 | 4 | Net payout | CRS credit report finds the auto loan, walk-away amount, negative equity and GAP, prequalification | `backend/app/crs.py` |
 | 5 | Rental and next car | 5a: demo rental options and a simulated Visa rental hold. 5b: ranked replacement cars in budget, CRS seller check (identity + liens), simulated Visa deposit. Both holds share one spending cap, with consent and an explained receipt | `backend/app/main.py`, `Rental.tsx`, `Replace.tsx` |
 
 The results card shows dollars at stake, checks failed (distinct checks, not rows) and minutes from upload to approved letter, with an audit trail.
+
+Claim API requests require a per-claim secret returned at upload; the backend stores only its SHA-256 hash and the browser keeps the secret locally. Uploaded reports are limited to 20 MB and 20 pages. Private claim records and local audit events expire after 30 days (`CLAIM_RETENTION_DAYS` can change this).
 
 ## Live vs demo
 
@@ -23,6 +25,7 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 - Apify: `e-commerce/cargurus-zipcode-search-scraper`; each search is saved in the database and reused for `MARKET_CACHE_HOURS` (24 on prod), capped at $0.50 per run.
 - CRS: sandbox REST API, test personas only (`backend/app/fixtures/crs_personas.json`), never real credit data.
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
+- MOSS: optional semantic retrieval for the voice claim guide. It indexes only the public guidance in `backend/app/fixtures/voice_knowledge.json`; per-claim facts go to Claude for the answer and are never sent to MOSS. Browser speech recognition and playback provide voice input/output, with a typed question fallback.
 - Visa: simulated checkout, labeled as such. Covers the rental hold and the car deposit; one spending cap applies to both.
 
 ## Demo cache
@@ -42,7 +45,7 @@ Rebuild the Claude read and letters with `cd backend && python scripts/build_dem
 - **Agents at work** (`agent_step`): the Reader, Appraiser, Negotiator and Shopper agents post each step as they work; every screen shows it live.
 - **Claim tracker** (`claim`, `claim_event`): `/track` follows every claim through the five steps, on any device.
 
-Public tables hold no personal data: claim ids, cars, dollar amounts, step names, dealer display names and a 3-digit ZIP area.
+The live tracker and auction use public SpacetimeDB tables for real-time subscriptions. Dealer-submitted VINs are discarded; the tables expose pseudonymous claim IDs, vehicle summaries, dollar amounts, step names, dealer display names and a 3-digit ZIP area. Treat that feed as public demo data, not private claim storage.
 
 - Publish: `cd spacetime && spacetime publish totaled-live --server maincloud`
 - Register the backend writer once: `cd backend && .venv/bin/python scripts/register_spacetime_writer.py totaled-live`, then set `SPACETIME_DB` and `SPACETIME_TOKEN` on the backend and `NEXT_PUBLIC_SPACETIME_DB` on the frontend.
@@ -50,7 +53,7 @@ Public tables hold no personal data: claim ids, cars, dollar amounts, step names
 
 ## Run it
 
-Backend (Python 3.9+):
+Backend (Python 3.10+):
 
 ```sh
 cd backend
@@ -68,6 +71,17 @@ npm run dev            # http://localhost:3000 (set NEXT_PUBLIC_API_URL if the A
 ```
 
 Regenerate the sample report and demo listings: `cd backend && .venv/bin/python scripts/make_sample_report.py`.
+
+### Voice claim guide (optional)
+
+Set `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, and optionally `MOSS_INDEX_NAME` in `backend/.env`, then create the guidance index once:
+
+```sh
+cd backend
+.venv/bin/python scripts/build_moss_index.py
+```
+
+The guide appears on the audit screen when MOSS and `ANTHROPIC_API_KEY` are configured. It uses the browser's speech APIs where available; typed questions work in every browser. MOSS is retrieval, while Claude writes a short answer grounded in retrieved guidance and the current claim's calculated facts. Say or type `VIN` followed by 17 characters and the guide automatically decodes the vehicle through NHTSA; VIN decoding does not check title history or vehicle condition.
 
 ## CRS MCP server (developer helper for Claude Code)
 

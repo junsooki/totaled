@@ -29,13 +29,13 @@ function Tracker() {
   const shown = useMemo(
     () =>
       [...claims]
-        .filter((c) => !only || c.claimId === only)
+        .filter((c) => !!only && c.claimId === only)
         .sort((a, b) => Number(b.updatedAt.microsSinceUnixEpoch - a.updatedAt.microsSinceUnixEpoch)),
     [claims, only],
   );
 
   if (!ready) return <p className="text-lg text-muted">Connecting to the live tracker…</p>;
-  if (!shown.length) return <p className="text-lg text-muted">No claims yet. Start one on the main page and watch it appear here.</p>;
+  if (!shown.length) return <p className="text-lg text-muted">Open the tracker link for a specific claim to view its progress.</p>;
 
   return (
     <div>
@@ -116,7 +116,7 @@ export default function TrackPage() {
     <main className="mx-auto w-full max-w-5xl px-4 py-10 font-sans text-ink sm:px-6">
       <h1 className="font-serif text-4xl font-semibold tracking-tight">Live claim tracker</h1>
       <p className="mt-2 max-w-prose text-lg text-muted">
-        Each step shows up here the moment it happens, on any device. Only public claim data is shown. No personal details.
+        Each step shows up here the moment it happens, on any device. Open a specific tracker link to see that claim&apos;s public progress.
       </p>
       <div className="mt-6">
         <LiveProvider><Tracker /></LiveProvider>

@@ -152,6 +152,13 @@ export const openAuction = spacetimedb.reducer(
   (ctx, a) => {
     requireWriter(ctx);
     if (a.budget <= 0) throw new SenderError('Budget must be positive');
+    if (!a.buyerVerified) throw new SenderError('Buyer must be verified before opening an auction');
+    if (a.durationSecs < 60 || a.durationSecs > 1800) throw new SenderError('Auction duration must be between 60 and 1800 seconds');
+    const existing = ctx.db.auction.auctionId.find(a.auctionId);
+    if (existing) {
+      if (existing.status === 'open') return; // A retry must not reset the clock or erase bids.
+      throw new SenderError('An auction for this claim has already been awarded');
+    }
     const row = {
       auctionId: a.auctionId,
       wanted: a.wanted,
@@ -164,8 +171,7 @@ export const openAuction = spacetimedb.reducer(
       winningBidId: 0n,
       createdAt: ctx.timestamp,
     };
-    if (ctx.db.auction.auctionId.find(a.auctionId)) ctx.db.auction.auctionId.update(row);
-    else ctx.db.auction.insert(row);
+    ctx.db.auction.insert(row);
   }
 );
 
@@ -201,7 +207,8 @@ export const placeBid = spacetimedb.reducer(
       dealer: ctx.sender,
       dealerName: dealer.name,
       car: a.car.trim().slice(0, 80),
-      vin: a.vin.trim().toUpperCase().slice(0, 17),
+      // VIN is not needed to compare offers and must not be stored in this public table.
+      vin: '',
       mileage: a.mileage,
       price: a.price,
       at: ctx.timestamp,
@@ -218,5 +225,11 @@ export const awardBid = spacetimedb.reducer({ auctionId: t.string(), bidId: t.u6
   if (!auction) throw new SenderError('No such auction');
   const bid = ctx.db.bid.id.find(a.bidId);
   if (!bid || bid.auctionId !== a.auctionId) throw new SenderError('No such bid in this auction');
+  if (auction.status === 'awarded') {
+    if (auction.winningBidId === a.bidId) return; // Safe retry after a lost response.
+    throw new SenderError('This auction already has a winning bid');
+  }
+  if (auction.status !== 'open') throw new SenderError('This auction is not open');
+  if (bid.price > auction.budget) throw new SenderError('The bid is over the buyer budget');
   ctx.db.auction.auctionId.update({ ...auction, status: 'awarded', winningBidId: a.bidId });
 });

@@ -153,6 +153,38 @@ def draft_letter(evidence: List[dict]) -> Letter:
     return response.parsed_output
 
 
+def answer_claim_question(question: str, claim_context: str, retrieved_context: str) -> str:
+    """Answer a spoken claim question using only the supplied claim facts and Moss references."""
+    client = anthropic.Anthropic()
+    response = client.beta.messages.create(
+        model=MODEL,
+        max_tokens=450,
+        output_config={"effort": "low"},
+        messages=[{
+            "role": "user",
+            "content": f"""You are Totaled's concise voice guide. Answer in natural spoken language, usually 1-3 sentences.
+Use only the claim facts and guidance below. Do not invent facts, deadlines, legal conclusions, or dollar amounts.
+If the information is insufficient, say what is missing. Explain estimates as estimates and say this is not legal advice.
+Never take an action: the user must approve letters, selections, and holds themselves.
+
+Claim facts:
+{claim_context}
+
+Retrieved guidance from Moss:
+{retrieved_context or "No relevant guidance was found."}
+
+User question: {question}"""
+        }],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError("The voice guide could not answer that question")
+    answer = "".join(block.text for block in response.content if block.type == "text").strip()
+    if not answer:
+        raise RuntimeError("The voice guide returned an empty answer")
+    return answer
+
+
 DOLLARS = re.compile(r"\$\s?([\d,]+(?:\.\d{1,2})?)")
 
 

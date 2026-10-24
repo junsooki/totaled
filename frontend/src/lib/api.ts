@@ -1,10 +1,22 @@
 export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+const claimTokenKey = (id: string) => `totaled:claim-token:${id}`;
+
+export function setClaimToken(id: string, token: string) {
+  if (typeof window !== "undefined") window.localStorage.setItem(claimTokenKey(id), token);
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type Json = any;
 
 export async function call(path: string, init?: RequestInit): Promise<Json> {
-  const res = await fetch(`${API}${path}`, init);
+  const headers = new Headers(init?.headers);
+  const claimId = /^\/api\/claims\/([^/]+)/.exec(path)?.[1];
+  if (claimId && typeof window !== "undefined") {
+    const token = window.localStorage.getItem(claimTokenKey(claimId));
+    if (token) headers.set("X-Claim-Token", token);
+  }
+  const res = await fetch(`${API}${path}`, { ...init, headers });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = body.detail;

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { API, Json, usd } from "@/lib/api";
 import { Badge, Notice, Stat, SummaryList } from "./ui";
 import { Bridge, Market } from "./ValueCharts";
+import VoiceAssistant from "./VoiceAssistant";
 
 const focusRing = "focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
@@ -105,7 +106,7 @@ function ReportLine({ src, alt }: { src: string; alt: string }) {
 const label = (s: string) => (s === "fail" ? "Failed" : s === "pass" ? "Passed" : "Needs a look");
 const toneCls = (s: string) => (s === "fail" ? "text-alert" : s === "pass" ? "text-brand" : "text-amber");
 
-export default function Audit({ id, claim, audit, checks }: { id: string; claim: Json; audit: Json; checks: Json[] }) {
+export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: string; claim: Json; audit: Json; checks: Json[]; voiceEnabled: boolean }) {
   const [open, setOpen] = useState<Set<number>>(new Set());
   const [shown, setShown] = useState<string | null>(null);
   const fv = audit.market.fair_value;
@@ -299,6 +300,7 @@ export default function Audit({ id, claim, audit, checks }: { id: string; claim:
       </Notice>
 
       <Tabs panels={{ failed: failedPanel, market: marketPanel, gap: gapPanel }} />
+      {voiceEnabled && <VoiceAssistant claimId={id} />}
     </div>
   );
 }

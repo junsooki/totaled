@@ -46,7 +46,7 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
       <div>
         <h2 className="font-serif text-2xl font-semibold text-ink">Your details</h2>
         <p className="mt-1 max-w-prose text-base text-muted">
-          We use test credit profiles only, never real credit data. Pick the one that stands in for you.
+          CRS checks a test credit profile for an auto loan and financing estimate. No real credit data is used. Pick a profile or enter a known loan balance.
         </p>
         <div className="mt-5 max-w-xl space-y-5">
           <label className={labelCls}>
@@ -86,6 +86,18 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
               ? `We found an auto loan on your credit report. You still owe ${usd(np.loan_balance)}, and that comes out of the payout first.`
               : "We found no open auto loan on your credit report, so the whole payout is yours."}
           </p>
+
+          <div className="max-w-xl border-t-2 border-rule pt-3">
+            <h3 className="font-serif text-xl font-semibold text-ink">How the estimate is worked out</h3>
+            <SummaryList
+              rows={[
+                { label: "Settlement used", value: usd(np.payout) },
+                { label: "Auto loan balance", value: np.loan_balance ? usd(np.loan_balance) : "No open auto loan found" },
+                { label: "Estimated cash to you", value: usd(np.walk_away), big: true, tone: np.negative_equity ? "bad" : "good" },
+              ]}
+            />
+            <p className="text-sm text-muted">CRS credit report · {result.credit.source === "demo" ? "demo data" : "live data"}. Financing is an illustration, not a lender offer.</p>
+          </div>
 
           {np.negative_equity && (
             <div className="max-w-prose">

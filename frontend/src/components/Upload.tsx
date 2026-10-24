@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { API, Json, put } from "@/lib/api";
+import { API, Json, put, setClaimToken } from "@/lib/api";
 import { Badge, Button, Notice, inputCls } from "./ui";
 
 const fileBtn =
@@ -57,6 +57,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       const res = await fetch(`${API}/api/claims`, { method: "POST", body: form });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? res.statusText);
+      setClaimToken(body.id, body.access_token);
       setDraft({ id: body.id, claim: body.claim, by: body.extracted_by });
       setStage("check");
     } catch (e) {

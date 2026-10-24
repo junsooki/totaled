@@ -135,8 +135,11 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
     <div className="space-y-10">
       <div>
         <p className="mb-3 flex flex-wrap items-center gap-2 text-base text-muted">
-          Listings are
+          Replacement search
           <Badge tone={data.source === "demo" ? "amber" : "green"}>{data.source}</Badge>
+        </p>
+        <p className="mb-5 max-w-prose text-base text-muted">
+          Your budget combines cash from the settlement with an illustrative financing estimate. CRS checks seller identity and records; deposits use a simulated Visa checkout.
         </p>
         <div className="grid gap-x-8 gap-y-6 sm:grid-cols-3">
           <Stat label="Your budget" value={usd(data.budget)} />
@@ -147,7 +150,11 @@ export default function Replace({ id, personas, cap, setCap, onPurchased }: {
 
       {LIVE && (
         <div className="border-t-2 border-rule pt-4">
-          <h2 className="mb-4 font-serif text-2xl font-semibold text-ink">Live dealer auction</h2>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h2 className="font-serif text-2xl font-semibold text-ink">Live dealer auction</h2>
+            <Badge tone="green">SpacetimeDB · live bids</Badge>
+          </div>
+          <p className="mb-4 max-w-prose text-base text-muted">Dealers compete in real time within your verified budget. You choose whether to accept a bid.</p>
           <LiveAuctionPanel
             claimId={id}
             onAwarded={(win) => {

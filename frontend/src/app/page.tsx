@@ -145,7 +145,7 @@ export default function Home() {
       <header className="border-b-4 border-brand">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-4 sm:px-6">
           <span className="font-serif text-2xl font-semibold tracking-tight text-brand">Totaled</span>
-          <p className="text-base text-muted">Insurers use software to value your totaled car. Now you have software to check theirs.</p>
+          <p className="text-base text-muted">Challenge the offer. See what you can spend. Find your next car.</p>
         </div>
       </header>
 
@@ -207,7 +207,7 @@ export default function Home() {
               footer={nav("Continue to counteroffer")}
             >
               {audit ? (
-                <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} />
+                <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} voiceEnabled={!!status?.voice_assistant} />
               ) : auditError ? (
                 <div>
                   <Notice tone="bad" title="The audit did not finish">{auditError}</Notice>
@@ -308,7 +308,7 @@ export default function Home() {
       <footer className="mt-12 border-t border-line pt-4 text-sm text-muted">
         {status ? (
           <p className="text-sm">
-            Data: Apify {status.apify} · CRS {status.crs} · Claude {status.claude} · Database {status.database}
+            Data: Apify {status.apify} · CRS {status.crs} · Claude {status.claude} · Moss {status.moss} · Database {status.database}
           </p>
         ) : (
           <p className="text-sm">{statusError ? "Server status unavailable" : "Connecting…"}</p>

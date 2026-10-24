@@ -1,22 +1,26 @@
 import base64
+import asyncio
+import hashlib
 import json
 import math
 import os
 import re
+import secrets
+import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
 import fitz
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, comps, crs, db, demo_cache, live  # noqa: E402
+from . import ai, comps, crs, db, demo_cache, live, moss_voice  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -36,6 +40,24 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def protect_claim_api(request: Request, call_next):
+    """Claim APIs require the per-claim secret returned at creation; tracker data stays separate."""
+    if request.method != "OPTIONS":
+        parts = request.url.path.strip("/").split("/")
+        if len(parts) >= 3 and parts[:2] == ["api", "claims"] and parts[2] != "":
+            cid = parts[2]
+            try:
+                data = db.get(cid)
+            except KeyError:
+                return Response(status_code=404, content="Claim not found")
+            token = request.headers.get("x-claim-token", "")
+            digest = hashlib.sha256(token.encode()).hexdigest() if token else ""
+            if not data.get("access_token_hash") or not secrets.compare_digest(digest, data["access_token_hash"]):
+                return Response(status_code=401, content="Claim access token is missing or invalid")
+    return await call_next(request)
+
+
 def _claim(cid: str) -> dict:
     try:
         return db.get(cid)
@@ -49,6 +71,8 @@ def status():
         "apify": "demo" if comps.demo_mode() else ("live" if os.environ.get("APIFY_TOKEN") else "missing"),
         "claude": "live" if ai.available() else "missing",
         "crs": "demo" if crs.demo_mode() else ("live" if crs.available() else "missing"),
+        "moss": "ready" if moss_voice.available() else "missing",
+        "voice_assistant": bool(moss_voice.available() and ai.available()),
         "database": "postgres" if db.DATABASE_URL else "sqlite",
         "checks": [{"check": n, "name": name, "rule": sec} for n, name, sec in CHECKS],
         "personas": [{k: p[k] for k in ("id", "name", "profile", "decision")} for p in crs.PERSONAS],
@@ -74,13 +98,33 @@ def _photos_to_pdf(photos: List[bytes]) -> bytes:
 async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     """Upload the valuation report as a PDF or as photos of its pages; send nothing to load the sample report."""
     if files:
-        blobs = [await f.read() for f in files]
+        if len(files) > 20:
+            raise HTTPException(413, "Upload at most 20 report pages at a time")
+        blobs = []
+        total_bytes = 0
+        for f in files:
+            blob = await f.read(20 * 1024 * 1024 + 1)
+            total_bytes += len(blob)
+            if len(blob) > 20 * 1024 * 1024 or total_bytes > 20 * 1024 * 1024:
+                raise HTTPException(413, "The report must be smaller than 20 MB")
+            blobs.append(blob)
         pdfs = [b for b, f in zip(blobs, files) if f.content_type == "application/pdf"]
         if pdfs and len(files) > 1:
             raise HTTPException(400, "Upload one PDF, or photos of the pages, not both")
         pdf, sample = (pdfs[0] if pdfs else _photos_to_pdf(blobs)), False
     else:
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
+
+    try:
+        doc = fitz.open(stream=pdf, filetype="pdf")
+        page_count = doc.page_count
+        doc.close()
+        if page_count > 20:
+            raise HTTPException(413, "The report can contain at most 20 pages")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(415, "Could not read the uploaded PDF")
 
     saved = demo_cache.extraction(pdf)  # a saved real Claude read of this exact report works without a key too
     if saved:
@@ -98,13 +142,15 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     if sample and not claim.get("owner_zip"):
         claim["owner_zip"] = "94704"  # the sample report prints no ZIP; 94704 is what the sample fixture and saved demo data use
 
+    access_token = secrets.token_urlsafe(32)
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
+                     "access_token_hash": hashlib.sha256(access_token.encode()).hexdigest(),
                      "extracted_by": by, "created_at": db.now()})
     v = claim["vehicle"]
     live.agent(cid, "Reader", "done", f"Read the report ({by}): {v['year']} {v['make']} {v['model']}, "
                                       f"{len(claim['comparables'])} comparables, offer ${claim['offer']['total']:,.2f}")
     db.log(cid, "extracted", {"by": by, "comparables": len(claim["comparables"])})
-    return {"id": cid, "claim": claim, "extracted_by": by, "sample": sample}
+    return {"id": cid, "access_token": access_token, "claim": claim, "extracted_by": by, "sample": sample}
 
 
 @app.get("/api/vin/{vin}")
@@ -209,6 +255,55 @@ def audit(cid: str):
     db.log(cid, "audited", {"failed": result["failed"], "market_source": market["source"],
                             "gap": co["gap"] if co else None})
     return result
+
+
+class VoiceQuestion(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+
+
+@app.post("/api/claims/{cid}/voice-answer")
+async def voice_answer(cid: str, body: VoiceQuestion):
+    """Answer a transcribed voice question with Moss retrieval and the private claim's deterministic facts."""
+    data = _claim(cid)
+    if not moss_voice.available():
+        raise HTTPException(503, "Set MOSS_PROJECT_ID, MOSS_PROJECT_KEY, and build the Totaled Moss index")
+    if not ai.available():
+        raise HTTPException(503, "Set ANTHROPIC_API_KEY to enable spoken answers")
+
+    claim = Claim(**data["claim"])
+    audit_data = data.get("audit") or {}
+    payout = data.get("payout") or {}
+    outcome = payout.get("at_counteroffer") or payout.get("at_offer") or {}
+    failed = [row for row in audit_data.get("checks", []) if row.get("status") == "fail"]
+    facts = [
+        f"Vehicle: {claim.vehicle.year} {claim.vehicle.make} {claim.vehicle.model} {claim.vehicle.trim or ''}".strip(),
+        f"Insurer offer: ${claim.offer.total:,.2f} dated {claim.offer.offer_date}.",
+        f"Audit failed {len({row.get('check') for row in failed})} distinct checks. "
+        + "; ".join(f"Check {row.get('check')}: {row.get('detail')}" for row in failed[:8]),
+    ]
+    if audit_data.get("market", {}).get("fair_value"):
+        facts.append(f"Estimated market value: ${audit_data['market']['fair_value']['estimate']:,.2f}.")
+    if audit_data.get("counteroffer"):
+        co = audit_data["counteroffer"]
+        facts.append(f"Estimated counteroffer total: ${co['total']:,.2f}; estimated difference from offer: ${co['gap']:,.2f}.")
+    if audit_data.get("deadline"):
+        facts.append(f"Reminder date shown by the app: {audit_data['deadline']['date']}.")
+    if outcome:
+        facts.append(f"Estimated walk-away amount: ${outcome['walk_away']:,.2f}; loan balance used: ${outcome['loan_balance']:,.2f}.")
+    claim_context = "\n".join(facts)
+
+    live.agent(cid, "Voice guide", "working", "Searching Totaled guidance and preparing a spoken answer")
+    try:
+        retrieval = await moss_voice.search(body.question)
+        retrieved_context = "\n".join(
+            f"[{doc['id']}] {doc['text']}" for doc in retrieval["docs"]
+        )
+        answer = await asyncio.to_thread(ai.answer_claim_question, body.question, claim_context, retrieved_context)
+    except Exception as e:
+        live.agent(cid, "Voice guide", "error", "Could not retrieve guidance or prepare an answer")
+        raise HTTPException(502, f"Voice assistant unavailable: {e}")
+    live.agent(cid, "Voice guide", "done", f"Answered using {len(retrieval['docs'])} Moss references")
+    return {"answer": answer, "references": retrieval["docs"], "retrieval_ms": retrieval["time_ms"]}
 
 
 # --- 3. Counteroffer ---------------------------------------------------------
@@ -338,22 +433,24 @@ class RentalCheckout(BaseModel):
 @app.post("/api/claims/{cid}/rental-checkout")
 def rental_checkout(cid: str, body: RentalCheckout):
     """Simulated Visa hold for a rental car. No real payment is made."""
-    data = _claim(cid)
     opt = next((o for o in _rental_options() if o["id"] == body.rental_id), None)
     if not opt:
         raise HTTPException(400, "Pick a rental from the options")
     if not 1 <= body.days <= 90:
         raise HTTPException(422, "Days must be between 1 and 90")
-    receipt = _simulated_receipt(
-        data, "purchase", body.deposit, body.spending_cap, body.consent,
-        "Refundable rental hold",
-        "A card hold, released when the car is returned. The rental cost is paid at the counter.",
-        rental={"agency": opt["agency"], "car_class": opt["car_class"], "example_car": opt["example_car"],
-                "daily_rate": opt["daily_rate"], "days": body.days,
-                "estimated_total": round(opt["daily_rate"] * body.days, 2)})
-    db.update(cid, rental=receipt)
-    db.log(cid, "rental_hold", {"rental_id": body.rental_id, "days": body.days, "amount": body.deposit, "simulated": True})
-    return receipt
+    detail = {"rental_id": body.rental_id, "days": body.days, "amount": body.deposit, "simulated": True}
+    rental = {"id": body.rental_id, "agency": opt["agency"], "car_class": opt["car_class"],
+              "example_car": opt["example_car"], "daily_rate": opt["daily_rate"], "days": body.days,
+              "estimated_total": round(opt["daily_rate"] * body.days, 2)}
+    def hold(data):
+        receipt = _simulated_receipt(
+            data, "purchase", body.deposit, body.spending_cap, body.consent,
+            "Refundable rental hold",
+            "A card hold, released when the car is returned. The rental cost is paid at the counter.",
+            rental=rental)
+        data["rental"] = receipt
+        return data
+    return db.mutate(cid, hold, ("rental_hold", detail))["rental"]
 
 
 # --- 5b. Replace -------------------------------------------------------------
@@ -397,7 +494,7 @@ def seller_check(cid: str, body: SellerCheck):
     except Exception as e:
         raise HTTPException(502, f"CRS seller check failed: {e}")
     result["vin"] = body.vin
-    db.log(cid, "seller_check", {"vin": body.vin, "persona": body.persona, "verdict": result["verdict"]})
+    db.log(cid, "seller_check", {"persona": body.persona, "verdict": result["verdict"]})
     return result
 
 
@@ -425,7 +522,7 @@ def _simulated_receipt(data: dict, other_key: str, deposit: float, spending_cap:
                                      f"${deposit + other:,.2f}, over your spending cap ${spending_cap:,.2f}")
         raise HTTPException(400, f"Deposit ${deposit:,.2f} is over your spending cap ${spending_cap:,.2f}")
     return {
-        "id": "SIM-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+        "id": "SIM-" + uuid.uuid4().hex[:12].upper(),
         "simulated": True,
         "network": "Visa (simulated)",
         **extra,
@@ -454,14 +551,16 @@ def checkout(cid: str, body: Checkout):
         car = win
     if not car:
         raise HTTPException(400, "Pick a car from the shortlist or the auction")
-    receipt = _simulated_receipt(
-        data, "rental", body.deposit, body.spending_cap, body.consent,
-        "Refundable hold deposit", "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't.",
-        car={k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")})
-
-    db.update(cid, purchase=receipt)
-    db.log(cid, "deposit", {"vin": body.vin, "amount": body.deposit, "simulated": True})
-    return receipt
+    detail = {"vin": body.vin, "amount": body.deposit, "simulated": True}
+    car_details = {k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")}
+    def hold(data):
+        receipt = _simulated_receipt(
+            data, "rental", body.deposit, body.spending_cap, body.consent,
+            "Refundable hold deposit", "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't.",
+            car=car_details)
+        data["purchase"] = receipt
+        return data
+    return db.mutate(cid, hold, ("deposit", detail))["purchase"]
 
 
 # --- Reverse auction (SpacetimeDB) -------------------------------------------

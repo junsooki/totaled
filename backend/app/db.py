@@ -3,16 +3,19 @@
 SQLite by default; Postgres (e.g. Supabase) when DATABASE_URL is set.
 """
 import json
+import logging
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable, Optional, Tuple
 
 from . import live
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", Path(__file__).resolve().parent.parent / "data" / "totaled.db"))
+CLAIM_RETENTION_DAYS = max(1, int(os.environ.get("CLAIM_RETENTION_DAYS", "30")))
 
 
 def _connect():
@@ -43,7 +46,8 @@ def now() -> str:
 
 
 def create(data: dict) -> str:
-    cid = uuid.uuid4().hex[:12]
+    prune_expired_claims()
+    cid = uuid.uuid4().hex
     conn, p = _connect()
     conn.execute(f"INSERT INTO claims (id, created_at, data) VALUES ({p}, {p}, {p})", (cid, now(), json.dumps(data)))
     conn.close()
@@ -61,11 +65,51 @@ def get(cid: str) -> dict:
 
 
 def update(cid: str, **fields) -> dict:
-    data = get(cid)
-    data.update(fields)
     conn, p = _connect()
-    conn.execute(f"UPDATE claims SET data = {p} WHERE id = {p}", (json.dumps(data), cid))
-    conn.close()
+    try:
+        conn.execute("BEGIN" if DATABASE_URL else "BEGIN IMMEDIATE")
+        lock = " FOR UPDATE" if DATABASE_URL else ""
+        row = conn.execute(f"SELECT data FROM claims WHERE id = {p}{lock}", (cid,)).fetchone()
+        if not row:
+            raise KeyError(cid)
+        data = json.loads(row[0])
+        data.update(fields)
+        conn.execute(f"UPDATE claims SET data = {p} WHERE id = {p}", (json.dumps(data), cid))
+        conn.commit()
+        return data
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def mutate(cid: str, change: Callable[[dict], dict], event: Optional[Tuple[str, dict]] = None) -> dict:
+    """Atomically read and change a claim, optionally recording its event in the same transaction."""
+    conn, p = _connect()
+    try:
+        conn.execute("BEGIN" if DATABASE_URL else "BEGIN IMMEDIATE")
+        lock = " FOR UPDATE" if DATABASE_URL else ""
+        row = conn.execute(f"SELECT data FROM claims WHERE id = {p}{lock}", (cid,)).fetchone()
+        if not row:
+            raise KeyError(cid)
+        data = change(json.loads(row[0]))
+        conn.execute(f"UPDATE claims SET data = {p} WHERE id = {p}", (json.dumps(data), cid))
+        if event:
+            kind, detail = event
+            conn.execute(f"INSERT INTO events (claim_id, at, kind, detail) VALUES ({p}, {p}, {p}, {p})",
+                         (cid, now(), kind, json.dumps(detail)))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    if event and live.enabled():
+        try:
+            live.report(cid, event[0], event[1], data)
+        except Exception:
+            logging.exception("SpacetimeDB event failed after claim update (%s)", event[0])
     return data
 
 
@@ -100,3 +144,25 @@ def cache_set(key: str, listings: list):
                  "ON CONFLICT (key) DO UPDATE SET at = excluded.at, data = excluded.data",
                  (key, now(), json.dumps(listings)))
     conn.close()
+
+
+def prune_expired_claims() -> int:
+    """Delete expired claim documents and their audit events from the private application database."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=CLAIM_RETENTION_DAYS)).isoformat()
+    conn, p = _connect()
+    try:
+        conn.execute("BEGIN" if DATABASE_URL else "BEGIN IMMEDIATE")
+        rows = conn.execute(f"SELECT id FROM claims WHERE created_at < {p}", (cutoff,)).fetchall()
+        for (cid,) in rows:
+            conn.execute(f"DELETE FROM events WHERE claim_id = {p}", (cid,))
+            conn.execute(f"DELETE FROM claims WHERE id = {p}", (cid,))
+        conn.commit()
+        return len(rows)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+prune_expired_claims()

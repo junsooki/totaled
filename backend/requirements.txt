@@ -8,3 +8,4 @@ pymupdf>=1.26
 python-multipart>=0.0.9
 requests>=2.31
 psycopg[binary]>=3.2
+moss>=1.9.0
