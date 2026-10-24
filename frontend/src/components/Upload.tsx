@@ -64,6 +64,61 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
     }
   }
 
+  // VIN: decode with NHTSA (free) or scan a photo; fill empty fields, flag disagreements with the report.
+  const [vinNote, setVinNote] = useState<string | null>(null);
+  const [vinBusy, setVinBusy] = useState(false);
+
+  function applyVin(d: Json) {
+    if (!draft) return;
+    let claim = setIn(draft.claim, ["vehicle", "vin"], d.vin);
+    const v = draft.claim.vehicle;
+    const filled: string[] = [];
+    const differs: string[] = [];
+    for (const k of ["year", "make", "model", "trim"] as const) {
+      if (d[k] == null) continue;
+      if (v[k] == null || v[k] === "") {
+        claim = setIn(claim, ["vehicle", k], d[k]);
+        filled.push(k);
+      } else if (String(v[k]).toLowerCase() !== String(d[k]).toLowerCase()) {
+        differs.push(`${k}: VIN says ${d[k]}, report says ${v[k]}`);
+      }
+    }
+    if (d.odometer != null && v.mileage == null) {
+      claim = setIn(claim, ["vehicle", "mileage"], d.odometer);
+      filled.push("mileage");
+    }
+    setDraft({ ...draft, claim });
+    setVinNote(
+      [`VIN ${d.vin}: ${[d.year, d.make, d.model, d.trim].filter(Boolean).join(" ")}`,
+        filled.length ? `filled ${filled.join(", ")}` : "",
+        differs.length ? `check: ${differs.join("; ")}` : "",
+        d.odometer != null ? `odometer in photo: ${d.odometer.toLocaleString()} mi` : "",
+        d.warning ?? ""].filter(Boolean).join(" · "),
+    );
+  }
+
+  async function vinRequest(req: Promise<Response>) {
+    setVinBusy(true);
+    setVinNote(null);
+    try {
+      const res = await req;
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.detail ?? res.statusText);
+      applyVin(body);
+    } catch (e) {
+      setVinNote(e instanceof Error ? e.message : String(e));
+    } finally {
+      setVinBusy(false);
+    }
+  }
+
+  const decodeVin = (vin: string) => vinRequest(fetch(`${API}/api/vin/${encodeURIComponent(vin)}`));
+  const scanVin = (photo: File) => {
+    const form = new FormData();
+    form.append("photo", photo);
+    return vinRequest(fetch(`${API}/api/vin/scan`, { method: "POST", body: form }));
+  };
+
   const field = (path: Path, key: string) => {
     const value = path.reduce((o: Json, k) => o?.[k], draft!.claim);
     return (
@@ -117,6 +172,18 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
             <label key={k} className="text-xs text-zinc-500">{label}{field(["vehicle", k], k)}</label>
           ))}
           <label className="text-xs text-zinc-500">Your ZIP{field(["owner_zip"], "owner_zip")}</label>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <label className="cursor-pointer rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700">
+            {vinBusy ? "Reading…" : "Scan VIN (photo)"}
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={vinBusy}
+              onChange={(e) => e.target.files?.[0] && scanVin(e.target.files[0])} />
+          </label>
+          <button className="rounded border border-zinc-300 px-2 py-1 disabled:opacity-50 dark:border-zinc-700"
+            disabled={vinBusy || (c.vehicle.vin ?? "").length !== 17} onClick={() => decodeVin(c.vehicle.vin)}>
+            Decode VIN
+          </button>
+          <span className="text-zinc-500">{vinNote ?? "Door-jamb sticker, dashboard plate or registration card."}</span>
         </div>
       </div>
       <div>

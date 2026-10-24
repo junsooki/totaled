@@ -15,6 +15,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from . import ai, comps, crs, db  # noqa: E402
+from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
 from .schemas import Claim  # noqa: E402
@@ -94,6 +95,39 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
                      "extracted_by": by, "created_at": db.now()})
     db.log(cid, "extracted", {"by": by, "comparables": len(claim["comparables"])})
     return {"id": cid, "claim": claim, "extracted_by": by, "sample": sample}
+
+
+@app.get("/api/vin/{vin}")
+def decode_vin(vin: str):
+    try:
+        return vin_.decode(vin)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"VIN lookup failed: {e}")
+
+
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+@app.post("/api/vin/scan")
+async def scan_vin(photo: UploadFile = File(...)):
+    """Photo of a VIN plate, door sticker, registration or dashboard → VIN (decoded) and odometer."""
+    if not ai.available():
+        raise HTTPException(503, "Reading photos needs ANTHROPIC_API_KEY. Type the VIN instead; it still auto-fills.")
+    if photo.content_type not in IMAGE_TYPES:
+        raise HTTPException(415, "Use a JPEG or PNG photo")
+    try:
+        read = ai.read_vin(await photo.read(), photo.content_type)
+    except Exception as e:
+        raise HTTPException(502, f"Claude could not read the photo: {e}")
+    if not read.vin:
+        raise HTTPException(422, "No readable VIN in the photo. Try closer, with less glare.")
+    try:
+        decoded = vin_.decode(read.vin)
+    except ValueError as e:
+        decoded = {"vin": read.vin, "warning": str(e)}
+    return dict(decoded, odometer=read.odometer)
 
 
 @app.put("/api/claims/{cid}/claim")

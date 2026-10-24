@@ -2,7 +2,7 @@
 import base64
 import os
 import re
-from typing import List
+from typing import List, Optional
 
 import anthropic
 from pydantic import BaseModel
@@ -50,6 +50,36 @@ def extract_claim(pdf: bytes) -> Claim:
     )
     if response.stop_reason == "refusal" or response.parsed_output is None:
         raise RuntimeError(f"Claude could not read the report (stop_reason={response.stop_reason})")
+    return response.parsed_output
+
+
+class VinPhoto(BaseModel):
+    vin: Optional[str] = None
+    odometer: Optional[int] = None
+
+
+def read_vin(image: bytes, media_type: str) -> VinPhoto:
+    """Read the VIN (and odometer, if visible) from a photo of a VIN plate, door sticker, registration or dashboard."""
+    client = anthropic.Anthropic()
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=2000,
+        output_config={"effort": "low"},
+        output_format=VinPhoto,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type,
+                                             "data": base64.b64encode(image).decode()}},
+                {"type": "text", "text": "Read the 17-character VIN in this photo exactly as printed, and the odometer "
+                                         "reading in miles if one is visible. Leave a field null if it is not clearly "
+                                         "readable; never guess characters."},
+            ],
+        }],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not read the photo (stop_reason={response.stop_reason})")
     return response.parsed_output
 
 
