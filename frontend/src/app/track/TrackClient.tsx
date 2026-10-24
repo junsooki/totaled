@@ -2,13 +2,12 @@
 
 // Live claim tracker: subscribes to SpacetimeDB, so every step the backend records shows up instantly.
 import { useMemo, useState } from "react";
-import { SpacetimeDBProvider, useTable } from "spacetimedb/react";
+import { useTable } from "spacetimedb/react";
+import AgentFeed from "@/components/live/AgentFeed";
 import { Badge, Stat } from "@/components/ui";
 import { usd } from "@/lib/api";
-import { DbConnection, tables } from "@/module_bindings";
-
-const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST ?? "wss://maincloud.spacetimedb.com";
-const DB = process.env.NEXT_PUBLIC_SPACETIME_DB;
+import { LiveProvider } from "@/lib/live";
+import { tables } from "@/module_bindings";
 
 const STEPS: [string, string[]][] = [
   ["Upload", ["extracted", "confirmed"]],
@@ -65,6 +64,7 @@ function Tracker() {
               <Stat label="Checks failed" value={at >= 1 ? c.checksFailed : "—"} />
               <Stat label="Walk away with" value={at >= 3 ? usd(c.walkAway) : "—"} />
             </div>
+            <div className="mt-3"><AgentFeed claimId={c.claimId} /></div>
             <ul className="mt-3 space-y-0.5 text-xs text-zinc-500">
               {feed.map((e) => (
                 <li key={e.id.toString()}>{e.at.toDate().toLocaleTimeString()} · <Badge>{e.kind}</Badge> {e.detail}</li>
@@ -78,31 +78,12 @@ function Tracker() {
 }
 
 export default function TrackPage() {
-  const builder = useMemo(
-    () =>
-      DB
-        ? DbConnection.builder()
-            .withUri(HOST)
-            .withDatabaseName(DB)
-            .onConnect((conn) => {
-              conn.subscriptionBuilder().subscribe([tables.claim, tables.claimEvent]);
-            })
-        : null,
-    [],
-  );
-
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-10 font-sans">
       <h1 className="text-2xl font-semibold tracking-tight">Totaled · live claim tracker</h1>
       <p className="mt-1 text-sm text-zinc-500">Updates the moment each step happens, on any device. Powered by SpacetimeDB.</p>
       <div className="mt-6">
-        {builder ? (
-          <SpacetimeDBProvider connectionBuilder={builder}>
-            <Tracker />
-          </SpacetimeDBProvider>
-        ) : (
-          <p className="text-sm text-red-600">NEXT_PUBLIC_SPACETIME_DB is not set.</p>
-        )}
+        <LiveProvider><Tracker /></LiveProvider>
       </div>
     </main>
   );

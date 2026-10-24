@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from . import ai, comps, crs, db  # noqa: E402
+from . import ai, comps, crs, db, live  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -91,6 +91,9 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
 
     cid = db.create({"pdf": base64.b64encode(pdf).decode(), "sample": sample, "claim": claim,
                      "extracted_by": by, "created_at": db.now()})
+    v = claim["vehicle"]
+    live.agent(cid, "Reader", "done", f"Read the report ({by}): {v['year']} {v['make']} {v['model']}, "
+                                      f"{len(claim['comparables'])} comparables, offer ${claim['offer']['total']:,.2f}")
     db.log(cid, "extracted", {"by": by, "comparables": len(claim["comparables"])})
     return {"id": cid, "claim": claim, "extracted_by": by, "sample": sample}
 
@@ -157,9 +160,13 @@ def audit(cid: str):
     claim = Claim(**data["claim"])
     v = claim.vehicle
     checks = run_checks(claim)
+    failed = sum(1 for r in checks if r["status"] == "fail")
+    live.agent(cid, "Appraiser", "working", f"Ran the 10 checks under 10 CCR § 2695.8: {failed} failed. "
+                                            f"Pulling live {v.year} {v.make} {v.model} listings near {claim.owner_zip[:3]}xx")
     try:
         market = comps.search(v.make, v.model, v.year, v.year, claim.owner_zip, LOCAL_RADIUS_MI)
     except Exception as e:
+        live.agent(cid, "Appraiser", "error", f"Market search failed: {e}")
         raise HTTPException(502, f"Could not fetch market listings: {e}")
 
     matches = comparable_listings(market["listings"], v)
@@ -181,6 +188,10 @@ def audit(cid: str):
                      "insurer_exception_may_apply": reopen_exception(claim)},
     }
     db.update(cid, audit=result)
+    live.agent(cid, "Appraiser", "done",
+               f"{len(matches)} true comparables of {len(market['listings'])} listings ({market['source']}); "
+               + (f"market value ${fv['estimate']:,} vs insurer base ${claim.offer.base_value:,.0f}; gap ${co['gap']:,.0f}"
+                  if co else "no matching listings"))
     db.log(cid, "audited", {"failed": result["failed"], "market_source": market["source"],
                             "gap": co["gap"] if co else None})
     return result
@@ -195,6 +206,7 @@ def draft(cid: str):
         raise HTTPException(400, "Run the audit first")
     claim = Claim(**data["claim"])
     evidence = build_evidence(claim, data["audit"])
+    live.agent(cid, "Negotiator", "working", f"Drafting the counteroffer from {len(evidence)} pieces of evidence")
     if ai.available():
         try:
             letter, by = ai.draft_letter(evidence), "claude"
@@ -204,7 +216,10 @@ def draft(cid: str):
         letter, by = template_letter(claim, evidence), "template (Claude not configured)"
     sentences = ai.citation_check(letter, evidence)
     db.update(cid, evidence=evidence, letter={"sentences": sentences, "drafted_by": by, "drafted_at": db.now()})
-    db.log(cid, "letter_drafted", {"by": by, "rejected": sum(1 for s in sentences if not s["ok"])})
+    rejected = sum(1 for s in sentences if not s["ok"])
+    live.agent(cid, "Negotiator", "done", f"Draft ready ({by}): {len(sentences)} sentences, "
+                                          f"{rejected} rejected by the citation check. Waiting for your approval")
+    db.log(cid, "letter_drafted", {"by": by, "rejected": rejected})
     return {"sentences": sentences, "evidence": evidence, "drafted_by": by}
 
 
@@ -254,6 +269,9 @@ def payout(cid: str, body: PayoutRequest):
         "at_counteroffer": crs.net_payout(co["total"], credit, body.loan_balance, body.has_gap) if co else None,
     }
     db.update(cid, payout=result)
+    np_ = result["at_counteroffer"] or result["at_offer"]
+    live.agent(cid, "Shopper", "done", f"CRS ({credit['source']}): {len(credit['auto_loans'])} auto loan(s); walk away with "
+                                       f"${np_['walk_away']:,.0f}; financing {np_['prequal']['decision'].lower()}")
     db.log(cid, "payout", {"persona": body.persona, "source": credit["source"]})
     return result
 
@@ -280,6 +298,7 @@ def replace(cid: str):
     result = {"budget": round(budget, 2), "walk_away": np_["walk_away"], "financing": np_["prequal"],
               "source": market["source"], "shortlist": ranked}
     db.update(cid, replace=result)
+    live.agent(cid, "Shopper", "done", f"{len(ranked)} cars under the ${result['budget']:,.0f} budget, ranked by value")
     db.log(cid, "shortlist", {"budget": result["budget"], "count": len(ranked)})
     return result
 
@@ -320,13 +339,16 @@ def checkout(cid: str, body: Checkout):
     if body.deposit > body.spending_cap:
         raise HTTPException(400, f"Deposit ${body.deposit:,.2f} is over your spending cap ${body.spending_cap:,.2f}")
     car = next((l for l in (data.get("replace") or {}).get("shortlist", []) if l["vin"] == body.vin), None)
+    win = data.get("auction_win")
+    if not car and win and win["vin"] == body.vin:
+        car = win
     if not car:
-        raise HTTPException(400, "Pick a car from the shortlist")
+        raise HTTPException(400, "Pick a car from the shortlist or the auction")
     receipt = {
         "id": "SIM-" + datetime.now().strftime("%Y%m%d%H%M%S"),
         "simulated": True,
         "network": "Visa (simulated)",
-        "car": {k: car.get(k) for k in ("vin", "year", "make", "model", "trim", "price", "seller_name")},
+        "car": {k: car.get(k) for k in ("vin", "car", "year", "make", "model", "trim", "price", "seller_name")},
         "lines": [
             {"label": "Refundable hold deposit", "amount": body.deposit,
              "why": "Holds the car for 48 hours; applied to the price if you buy, refunded if you don't."},
@@ -340,6 +362,66 @@ def checkout(cid: str, body: Checkout):
     db.update(cid, purchase=receipt)
     db.log(cid, "deposit", {"vin": body.vin, "amount": body.deposit, "simulated": True})
     return receipt
+
+
+# --- Reverse auction (SpacetimeDB) -------------------------------------------
+
+class AuctionRequest(BaseModel):
+    duration_secs: int = 180
+
+
+def _require_live():
+    if not live.enabled():
+        raise HTTPException(503, "The live auction needs SpacetimeDB: set SPACETIME_DB and SPACETIME_TOKEN")
+
+
+@app.post("/api/claims/{cid}/auction")
+def open_auction(cid: str, body: AuctionRequest):
+    """Dealers compete live to sell the replacement car to this verified, prequalified buyer."""
+    data = _claim(cid)
+    _require_live()
+    if "payout" not in data:
+        raise HTTPException(400, "Compute the net payout first")
+    claim, p = Claim(**data["claim"]), data["payout"]
+    np_ = p["at_counteroffer"] or p["at_offer"]
+    budget = round(max(np_["walk_away"], 0) + np_["prequal"]["max_amount"], 2)
+    v = claim.vehicle
+    wanted = f"{v.year}–{v.year + 2} {v.make} {v.model}"
+    duration = max(60, min(body.duration_secs, 1800))
+    try:
+        live.open_auction(cid, wanted, budget, True, float(np_["prequal"]["max_amount"]), claim.owner_zip[:3], duration)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+    live.agent(cid, "Shopper", "working", f"Opened a {duration // 60}-minute reverse auction: dealers compete to sell a "
+                                          f"{wanted} under the verified ${budget:,.0f} budget")
+    db.log(cid, "auction_opened", {"budget": budget, "duration_secs": duration})
+    return {"auction_id": cid, "wanted": wanted, "budget": budget, "duration_secs": duration}
+
+
+class AwardRequest(BaseModel):
+    bid_id: int
+
+
+@app.post("/api/claims/{cid}/auction/award")
+def award(cid: str, body: AwardRequest):
+    """The buyer picks a bid. Its price is read back from SpacetimeDB, never trusted from the browser."""
+    data = _claim(cid)
+    _require_live()
+    rows = live.sql(f"SELECT * FROM bid WHERE id = {int(body.bid_id)}")
+    if not rows or rows[0]["auction_id"] != cid:
+        raise HTTPException(404, "No such bid in this auction")
+    b = rows[0]
+    try:
+        live.award(cid, int(body.bid_id))
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+    win = {"vin": b["vin"] or f"BID-{body.bid_id}", "car": b["car"], "price": b["price"], "mileage": b["mileage"],
+           "seller_name": b["dealer_name"], "seller_type": "DEALER", "bid_id": int(body.bid_id),
+           "year": None, "make": None, "model": None, "trim": None}
+    db.update(cid, auction_win=win)
+    live.agent(cid, "Shopper", "done", f"You chose {b['dealer_name']}: {b['car']} for ${b['price']:,.0f}")
+    db.log(cid, "auction_awarded", {"bid_id": int(body.bid_id), "price": b["price"]})
+    return win
 
 
 # --- Results -----------------------------------------------------------------

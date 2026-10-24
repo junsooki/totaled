@@ -1,8 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Json, post, usd } from "@/lib/api";
 import { Badge, Button, inputCls } from "./ui";
+
+const LiveAuctionPanel = dynamic(() => import("./live/LiveBits").then((m) => m.LiveAuctionPanel), { ssr: false });
+const carName = (c: Json) => c.car ?? `${c.year} ${c.make} ${c.model} ${c.trim ?? ""}`;
 
 export default function Replace({ id, personas, onPurchased }: { id: string; personas: Json[]; onPurchased: () => void }) {
   const [data, setData] = useState<Json | null>(null);
@@ -61,6 +65,10 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
         {data.financing.max_amount ? ` + up to ${usd(data.financing.max_amount)} prequalified financing` : ""}.{" "}
         <Badge tone={data.source === "demo" ? "amber" : "zinc"}>{data.source}</Badge>
       </p>
+      {process.env.NEXT_PUBLIC_SPACETIME_DB && (
+        <LiveAuctionPanel claimId={id} onAwarded={(win) => { setChecks({ ...checks, [win.vin]: { verdict: "OK: dealer chosen in the live auction" } }); setHold(win); setConsent(false); }} />
+      )}
+      <h3 className="pt-2 font-medium">Or pick from today&apos;s listings</h3>
       <label className="block max-w-md text-xs text-zinc-500">Seller identity for the check (CRS sandbox persona)
         <select className={inputCls} value={sellerPersona} onChange={(e) => setSellerPersona(e.target.value)}>
           {personas.map((p) => <option key={p.id} value={p.id}>{p.id} {p.name} ({p.profile})</option>)}
@@ -110,7 +118,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
         <div className="rounded border-2 border-zinc-900 p-4 dark:border-white">
           <h3 className="font-semibold">Approve this charge</h3>
           <p className="mt-1 text-sm">
-            Refundable hold deposit on the {hold.year} {hold.make} {hold.model} {hold.trim} ({usd(hold.price)}) from {hold.seller_name}.
+            Refundable hold deposit on the {carName(hold)} ({usd(hold.price)}) from {hold.seller_name}.
             It holds the car for 48 hours, counts toward the price if you buy, and is refunded if you don&apos;t.
           </p>
           <div className="mt-3 grid max-w-md grid-cols-2 gap-3">
@@ -133,7 +141,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
       {receipt && (
         <div className="rounded border border-green-600 p-4">
           <h3 className="font-semibold">Receipt {receipt.id} <Badge tone="amber">simulated</Badge></h3>
-          <p className="text-sm">{receipt.car.year} {receipt.car.make} {receipt.car.model} {receipt.car.trim} · {receipt.network}</p>
+          <p className="text-sm">{carName(receipt.car)} · {receipt.network}</p>
           <table className="mt-2 w-full text-sm">
             <tbody>
               {receipt.lines.map((ln: Json) => (

@@ -6,9 +6,19 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AwardBidReducer from "../award_bid_reducer";
 import ClaimWriterReducer from "../claim_writer_reducer";
+import JoinAsDealerReducer from "../join_as_dealer_reducer";
+import OpenAuctionReducer from "../open_auction_reducer";
+import PlaceBidReducer from "../place_bid_reducer";
+import RecordAgentStepReducer from "../record_agent_step_reducer";
 import RecordEventReducer from "../record_event_reducer";
 
+export type AwardBidParams = __Infer<typeof AwardBidReducer>;
 export type ClaimWriterParams = __Infer<typeof ClaimWriterReducer>;
+export type JoinAsDealerParams = __Infer<typeof JoinAsDealerReducer>;
+export type OpenAuctionParams = __Infer<typeof OpenAuctionReducer>;
+export type PlaceBidParams = __Infer<typeof PlaceBidReducer>;
+export type RecordAgentStepParams = __Infer<typeof RecordAgentStepReducer>;
 export type RecordEventParams = __Infer<typeof RecordEventReducer>;
 

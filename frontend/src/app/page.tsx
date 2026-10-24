@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Audit from "@/components/Audit";
 import Letter from "@/components/Letter";
@@ -8,6 +9,9 @@ import Replace from "@/components/Replace";
 import Upload from "@/components/Upload";
 import { Badge, Button, Section, Stat } from "@/components/ui";
 import { call, Json, post, usd } from "@/lib/api";
+
+const LiveAgentFeed = dynamic(() => import("@/components/live/LiveBits").then((m) => m.LiveAgentFeed), { ssr: false });
+const LIVE = !!process.env.NEXT_PUBLIC_SPACETIME_DB;
 
 export default function Home() {
   const [status, setStatus] = useState<Json | null>(null);
@@ -70,6 +74,10 @@ export default function Home() {
           <Upload onConfirmed={(cid, c) => { setId(cid); setClaim(c); refreshResults(cid); }} />
         )}
       </Section>
+
+      {id && claim && LIVE && (
+        <div className="mt-6"><LiveAgentFeed claimId={id} /></div>
+      )}
 
       {id && claim && (
         <Section title="2. Audit">

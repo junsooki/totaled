@@ -10,6 +10,43 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AgentStep = __t.object("AgentStep", {
+  id: __t.u64(),
+  claimId: __t.string(),
+  agent: __t.string(),
+  status: __t.string(),
+  text: __t.string(),
+  at: __t.timestamp(),
+});
+export type AgentStep = __Infer<typeof AgentStep>;
+
+export const Auction = __t.object("Auction", {
+  auctionId: __t.string(),
+  wanted: __t.string(),
+  budget: __t.f64(),
+  buyerVerified: __t.bool(),
+  financingApproved: __t.f64(),
+  zip3: __t.string(),
+  status: __t.string(),
+  endsAt: __t.timestamp(),
+  winningBidId: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type Auction = __Infer<typeof Auction>;
+
+export const Bid = __t.object("Bid", {
+  id: __t.u64(),
+  auctionId: __t.string(),
+  dealer: __t.identity(),
+  dealerName: __t.string(),
+  car: __t.string(),
+  vin: __t.string(),
+  mileage: __t.u32(),
+  price: __t.f64(),
+  at: __t.timestamp(),
+});
+export type Bid = __Infer<typeof Bid>;
+
 export const Claim = __t.object("Claim", {
   claimId: __t.string(),
   vehicle: __t.string(),
@@ -31,6 +68,13 @@ export const ClaimEvent = __t.object("ClaimEvent", {
   at: __t.timestamp(),
 });
 export type ClaimEvent = __Infer<typeof ClaimEvent>;
+
+export const Dealer = __t.object("Dealer", {
+  identity: __t.identity(),
+  name: __t.string(),
+  joinedAt: __t.timestamp(),
+});
+export type Dealer = __Infer<typeof Dealer>;
 
 export const Writer = __t.object("Writer", {
   identity: __t.identity(),

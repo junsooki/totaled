@@ -34,19 +34,67 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AwardBidReducer from "./award_bid_reducer";
 import ClaimWriterReducer from "./claim_writer_reducer";
+import JoinAsDealerReducer from "./join_as_dealer_reducer";
+import OpenAuctionReducer from "./open_auction_reducer";
+import PlaceBidReducer from "./place_bid_reducer";
+import RecordAgentStepReducer from "./record_agent_step_reducer";
 import RecordEventReducer from "./record_event_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import AgentStepRow from "./agent_step_table";
+import AuctionRow from "./auction_table";
+import BidRow from "./bid_table";
 import ClaimRow from "./claim_table";
 import ClaimEventRow from "./claim_event_table";
+import DealerRow from "./dealer_table";
 
 /** Type-only namespace exports for generated type groups. */
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  agentStep: __table({
+    name: 'agent_step',
+    indexes: [
+      { accessor: 'claimId', name: 'agent_step_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'agent_step_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'agent_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AgentStepRow),
+  auction: __table({
+    name: 'auction',
+    indexes: [
+      { accessor: 'auctionId', name: 'auction_auction_id_idx_btree', algorithm: 'btree', columns: [
+        'auctionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'auction_auction_id_key', constraint: 'unique', columns: ['auctionId'] },
+    ],
+  }, AuctionRow),
+  bid: __table({
+    name: 'bid',
+    indexes: [
+      { accessor: 'auctionId', name: 'bid_auction_id_idx_btree', algorithm: 'btree', columns: [
+        'auctionId',
+      ] },
+      { accessor: 'id', name: 'bid_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'bid_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, BidRow),
   claim: __table({
     name: 'claim',
     indexes: [
@@ -72,11 +120,27 @@ const tablesSchema = __schema({
       { name: 'claim_event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ClaimEventRow),
+  dealer: __table({
+    name: 'dealer',
+    indexes: [
+      { accessor: 'identity', name: 'dealer_identity_idx_btree', algorithm: 'btree', columns: [
+        'identity',
+      ] },
+    ],
+    constraints: [
+      { name: 'dealer_identity_key', constraint: 'unique', columns: ['identity'] },
+    ],
+  }, DealerRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("award_bid", AwardBidReducer),
   __reducerSchema("claim_writer", ClaimWriterReducer),
+  __reducerSchema("join_as_dealer", JoinAsDealerReducer),
+  __reducerSchema("open_auction", OpenAuctionReducer),
+  __reducerSchema("place_bid", PlaceBidReducer),
+  __reducerSchema("record_agent_step", RecordAgentStepReducer),
   __reducerSchema("record_event", RecordEventReducer),
 );
 
