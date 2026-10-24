@@ -82,15 +82,14 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     else:
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
 
-    if ai.available():
-        saved = demo_cache.extraction(pdf)
-        if saved:
-            claim, by = saved, "claude (saved demo run)"
-        else:
-            try:
-                claim, by = ai.extract_claim(pdf).model_dump(), "claude"
-            except Exception as e:
-                raise HTTPException(502, f"Claude could not read the report: {e}")
+    saved = demo_cache.extraction(pdf)  # a saved real Claude read of this exact report works without a key too
+    if saved:
+        claim, by = saved, "claude (saved demo run)"
+    elif ai.available():
+        try:
+            claim, by = ai.extract_claim(pdf).model_dump(), "claude"
+        except Exception as e:
+            raise HTTPException(502, f"Claude could not read the report: {e}")
     elif sample:
         claim, by = json.loads((FIXTURES / "sample_claim.json").read_text()), "sample fixture (Claude not configured)"
     else:
@@ -222,15 +221,14 @@ def draft(cid: str):
     claim = Claim(**data["claim"])
     evidence = build_evidence(claim, data["audit"])
     live.agent(cid, "Negotiator", "working", f"Drafting the counteroffer from {len(evidence)} pieces of evidence")
-    if ai.available():
-        saved = demo_cache.letter(evidence)
-        if saved:
-            letter, by = ai.Letter(**saved), "claude (saved demo run)"
-        else:
-            try:
-                letter, by = ai.draft_letter(evidence), "claude"
-            except Exception as e:
-                raise HTTPException(502, f"Claude could not draft the letter: {e}")
+    saved = demo_cache.letter(evidence)  # a saved real Claude letter for exactly this evidence works without a key too
+    if saved:
+        letter, by = ai.Letter(**saved), "claude (saved demo run)"
+    elif ai.available():
+        try:
+            letter, by = ai.draft_letter(evidence), "claude"
+        except Exception as e:
+            raise HTTPException(502, f"Claude could not draft the letter: {e}")
     else:
         letter, by = template_letter(claim, evidence), "template (Claude not configured)"
     sentences = ai.citation_check(letter, evidence)

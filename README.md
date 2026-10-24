@@ -27,11 +27,12 @@ Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CR
 
 ## Demo cache
 
-`backend/app/fixtures/demo_cache.json` holds saved results of real runs: the sample report read by Claude, the Apify searches for a 2019 Civic (blank ZIP and 94704), both letters, and the CRS sandbox results for all 20 personas.
-A saved result replaces a paid call only when the same input recurs and that integration is configured. Anything new still runs live.
+`backend/app/fixtures/demo_cache.json` holds saved results of real runs: the sample report read by Claude, the Apify searches for a 2019 Civic (blank ZIP and 94704), two letters (with and without the "Use an example" note), and the CRS sandbox results for all 20 personas.
+A saved result replaces a paid call only when the same input recurs (the bundled sample report, ZIP 94704, the example note). Anything new still runs live.
+The saved Claude read and letters also work when no `ANTHROPIC_API_KEY` is set, so a deployment without the key still shows the real Claude results for the sample. Apify and CRS saved results apply when those integrations are configured.
 The UI then shows "claude (saved demo run)", the original Apify fetch time, and "Saved data" for CRS.
 `DEMO_CACHE=0` turns it off.
-Rebuild it from the local database with `cd backend && python scripts/build_demo_cache.py --fetch-missing --fetch-crs`. The flags make paid Apify and CRS sandbox calls.
+Rebuild the Claude read and letters with `cd backend && python scripts/build_demo_cache.py --keep-existing --claims ID1 ID2` (ids of two finished local claims: one without the note, one with it). Without `--keep-existing` the script also refetches Apify and CRS data, which makes paid calls.
 
 ## Real-time core (SpacetimeDB)
 

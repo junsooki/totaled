@@ -9955,8 +9955,13 @@
   }
  },
  "extraction": {
-  "88a1e9cafdde0d7c72997d54ab38daa62caabd606b8875655b506848feb56756": {
+  "fbc23e7ce40138fb8782e3efd8a902b4fc16e54cbd4fbb8b6d85250332c136b1": {
    "owner_zip": "",
+   "insurer_name": "Golden State Mutual Insurance Co.",
+   "claim_number": "CLM-2026-48213",
+   "policy_number": "CA-AUTO-7731904",
+   "policyholder_name": "Jordan Rivera",
+   "loss_note": null,
    "vehicle": {
     "year": 2019,
     "make": "Honda",
@@ -9979,10 +9984,10 @@
     "registration_prorated": null,
     "deductible": 500.0,
     "total": 17104.75,
-    "written_explanation": false,
+    "written_explanation": true,
     "source": {
-     "page": 1,
-     "quote": "Total Settlement Offer: $17,104.75"
+     "page": 3,
+     "quote": "We have determined your vehicle to be a total loss. Our offer of $17,104.75 is based on"
     }
    },
    "condition": {
@@ -10095,281 +10100,278 @@
   }
  },
  "letters": {
-  "3fd496ad7f54ae1603cbab91a39d506956b3f7b9bfb8c6e21d23b8113fedd5af": {
+  "8841b07045a93c5b746db73f36058499f4996eb47aab74f327abefff3f76d33a": {
    "sentences": [
     {
-     "text": "Dear Claims Representative,",
+     "text": "Dear Golden State Mutual Insurance Co. Claims Department,",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "I am writing regarding the total loss valuation of my 2019 Honda Civic EX, VIN 2HGFC1F35KH654321, with 48,200 miles.",
+     "text": "Re: Claim number CLM-2026-48213, Policy number CA-AUTO-7731904, 2019 Honda Civic EX, VIN 2HGFC1F35KH654321",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "Thank you for your offer dated 2026-10-14, which totals $17,104.75 and uses a base value of $17,050.00.",
+     "text": "I am writing about your total loss offer dated 2026-10-14 for my 2019 Honda Civic EX with 48,200 miles, which totals $17,104.75 with a base value of $17,050.00.",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "After reviewing the valuation, I respectfully cannot accept this offer, and I would like to explain my reasons and propose a counteroffer.",
+     "text": "After reviewing the valuation, I respectfully do not accept this offer, for the reasons set out below.",
      "citations": [
       "claim",
-      "counter"
+      "check:5:C1",
+      "check:8"
      ]
     },
     {
-     "text": "Comparable C1 does not match my vehicle's trim, options and mileage, as referenced in 10 CCR \u00a7 2695.8(b)(2): it is an LX rather than an EX, it has 61,400 miles versus my 48,200 miles, and it lacks the Sunroof, Apple CarPlay and Heated Seats.",
+     "text": "Comparable C1 does not meet the requirement for \"Similar trim, options and mileage\" under 10 CCR \u00a7 2695.8(b)(2): it is an LX trim rather than an EX, it has 61,400 miles compared with my 48,200 miles, and it lacks a Sunroof, Apple CarPlay and Heated Seats.",
      "citations": [
       "check:5:C1"
      ]
     },
     {
-     "text": "Comparable C2 is not identified by VIN, stock number or plate and includes no seller contact, as referenced in 10 CCR \u00a7 2695.8(b)(2).",
+     "text": "Comparable C2 does not meet the requirement that a comparable be \"Identified by VIN, stock number or plate, with seller contact\" under 10 CCR \u00a7 2695.8(b)(2), because it has no VIN, stock number or plate and no seller contact.",
      "citations": [
       "check:4:C2"
      ]
     },
     {
-     "text": "Comparable C2 is also missing the Sunroof, Apple CarPlay and Heated Seats, which bears on the similar trim, options and mileage standard in 10 CCR \u00a7 2695.8(b)(2).",
+     "text": "Comparable C2 also does not meet the requirement for \"Similar trim, options and mileage\" under 10 CCR \u00a7 2695.8(b)(2), because it lacks a Sunroof, Apple CarPlay and Heated Seats.",
      "citations": [
       "check:5:C2"
      ]
     },
     {
-     "text": "Comparable C3 is 214 miles away and was listed 137 days before the offer, which falls outside the local availability standard of 100 miles within 90 days referenced in 10 CCR \u00a7 2695.8(b)(2), (b)(4)(A).",
+     "text": "Comparable C3 does not meet the requirement that a comparable be \"Available locally (100 mi) within 90 days\" under 10 CCR \u00a7 2695.8(b)(2), (b)(4)(A), because it is 214 mi away and was listed 137 days before the offer.",
      "citations": [
       "check:3:C3"
      ]
     },
     {
-     "text": "Comparable C3 is likewise missing the Sunroof, Apple CarPlay and Heated Seats, as referenced in 10 CCR \u00a7 2695.8(b)(2).",
+     "text": "Comparable C3 also does not meet the requirement for \"Similar trim, options and mileage\" under 10 CCR \u00a7 2695.8(b)(2), because it lacks a Sunroof, Apple CarPlay and Heated Seats.",
      "citations": [
       "check:5:C3"
      ]
     },
     {
-     "text": "The valuation includes a condition deduction of $1,150, even though my vehicle was graded \"Average\" and no documentation was provided; 10 CCR \u00a7 2695.8(b)(2) addresses condition deductions only where condition is documented below average.",
+     "text": "The valuation applies a condition deduction of $1,150 even though my vehicle was graded \"Average\" and no documentation was provided, while 10 CCR \u00a7 2695.8(b)(2) calls for a \"Condition deduction only if documented below average.\"",
      "citations": [
       "check:7"
      ]
     },
     {
-     "text": "In addition, the mileage adjustment of -400 for comparable C2 has the wrong sign given its 52,000 miles versus my 48,200 miles, and the average of the adjusted values is $17,266.67 rather than the $17,050.00 stated in the report, which bears on the base value standard in 10 CCR \u00a7 2695.8(b)(4)(A).",
+     "text": "Under 10 CCR \u00a7 2695.8(b)(4)(A), the \"Base value is the average of the comparables,\" but the C2 mileage adjustment of -400 has the wrong sign (52,000 vs 48,200 mi), and the average of the adjusted values is $17,266.67, not the $17,050.00 stated in the report.",
      "citations": [
       "check:8"
      ]
     },
     {
-     "text": "The offer does not include prorated registration, which is listed among the required components under 10 CCR \u00a7 2695.8(b)(1).",
+     "text": "Under 10 CCR \u00a7 2695.8(b)(1), the \"Offer includes tax, fees and prorated registration, minus deductible,\" but your offer is missing prorated registration.",
      "citations": [
       "check:9"
      ]
     },
     {
-     "text": "I also did not receive a written explanation with the offer, as referenced in 10 CCR \u00a7 2695.8(b)(4).",
-     "citations": [
-      "check:10"
-     ]
-    },
-    {
-     "text": "Current local listings for the same year, make, model and trim support a higher value, including a 2019 Honda Civic EX FWD with 27,670 miles listed at $23,047.00 by BMW of Concord, 14 miles away.",
-     "citations": [
-      "listing:JHMFC1F3XKX009872"
-     ]
-    },
-    {
-     "text": "Other examples include a 2019 Honda Civic EX FWD with 36,243 miles listed at $23,699.00 by Acura of Modesto, 70 miles away, and one with 23,107 miles listed at $22,981.00 by Mistlin Honda, 70 miles away.",
-     "citations": [
-      "listing:19XFC1F38KE213250",
-      "listing:19XFC1F36KE204739"
-     ]
-    },
-    {
-     "text": "For completeness, I also considered a 2019 Honda Civic EX FWD with 43,394 miles listed at $15,990.00 by envision motorsport, 64 miles away, and one with 207,220 miles listed at $10,900.00 by Quintero's Auto Sales, 41 miles away.",
-     "citations": [
-      "listing:19XFC1F38KE210073",
-      "listing:JHMFC1F35KX002716"
-     ]
-    },
-    {
-     "text": "Based on 11 current comparable listings and a linear fit of price on mileage, the market value of my vehicle at 48,200 miles is $20,457.00.",
+     "text": "Current market data supports a higher value: a linear fit of price on mileage across 11 current comparable listings gives a market value of $20,457.00 at 48,200 miles.",
      "citations": [
       "market"
      ]
     },
     {
-     "text": "Accordingly, I propose a counteroffer total of $22,128.84, consisting of the vehicle value of $20,457.00, sales tax of $2,096.84 and fees of $75.00, less my deductible of $500.00.",
+     "text": "For example, BMW of Concord, 14 mi away, lists a 2019 Honda Civic EX FWD with 27,670 miles, VIN JHMFC1F3XKX009872, at $23,047.00 (https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?sourceContext=carGurusHomePageModel&entitySelectingHelper.selectedEntity=&zip=94704#listing=462369858/NONE/DEFAULT).",
+     "citations": [
+      "listing:JHMFC1F3XKX009872"
+     ]
+    },
+    {
+     "text": "Mistlin Honda, 70 mi away, lists a 2019 Honda Civic EX FWD with 23,107 miles, VIN 19XFC1F36KE204739, at $22,981.00 (https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?sourceContext=carGurusHomePageModel&entitySelectingHelper.selectedEntity=&zip=94704#listing=461854595/NONE/DEFAULT).",
+     "citations": [
+      "listing:19XFC1F36KE204739"
+     ]
+    },
+    {
+     "text": "Acura of Modesto, 70 mi away, lists a 2019 Honda Civic EX FWD with 36,243 miles, VIN 19XFC1F38KE213250, at $23,699.00 (https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?sourceContext=carGurusHomePageModel&entitySelectingHelper.selectedEntity=&zip=94704#listing=460575836/NONE/DEFAULT).",
+     "citations": [
+      "listing:19XFC1F38KE213250"
+     ]
+    },
+    {
+     "text": "Envision motorsport, 64 mi away, lists a 2019 Honda Civic EX FWD with 43,394 miles, VIN 19XFC1F38KE210073, at $15,990.00 (https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?sourceContext=carGurusHomePageModel&entitySelectingHelper.selectedEntity=&zip=94704#listing=456058569/NONE/DEFAULT).",
+     "citations": [
+      "listing:19XFC1F38KE210073"
+     ]
+    },
+    {
+     "text": "Quintero's Auto Sales, 41 mi away, lists a 2019 Honda Civic EX FWD with 207,220 miles, VIN JHMFC1F35KX002716, at $10,900.00 (https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?sourceContext=carGurusHomePageModel&entitySelectingHelper.selectedEntity=&zip=94704#listing=447821466/NONE/DEFAULT).",
+     "citations": [
+      "listing:JHMFC1F35KX002716"
+     ]
+    },
+    {
+     "text": "Accordingly, I request a revised offer of $22,128.84, consisting of a vehicle value of $20,457.00, sales tax of $2,096.84 and fees of $75.00, less my $500.00 deductible, which is $5,024.09 above the current offer.",
      "citations": [
       "counter"
      ]
     },
     {
-     "text": "This figure is $5,024.09 above the current offer.",
-     "citations": [
-      "counter"
-     ]
-    },
-    {
-     "text": "I respectfully request a revised offer of $22,128.84, along with a written response addressing each of the points above.",
+     "text": "Please send me your response in writing, including an explanation for any of the points above that you do not accept.",
      "citations": [
       "counter",
-      "check:10"
+      "check:5:C1",
+      "check:4:C2",
+      "check:3:C3",
+      "check:7",
+      "check:8",
+      "check:9"
      ]
     },
     {
-     "text": "Thank you for your time and attention, and I look forward to resolving this claim promptly.",
+     "text": "Thank you for your attention to claim number CLM-2026-48213.",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "Sincerely, [Policyholder Name]",
+     "text": "Sincerely, Jordan Rivera",
      "citations": [
       "claim"
      ]
     }
    ]
   },
-  "8b38493b923bfe007fe566dfe5dbc4e5e04c131037356f7ccdb3f47b84bfc404": {
+  "7ddad45f2fda98c9bf6d3ff41d9b95d95d4a2c7829ab5505864d18912a04f81a": {
    "sentences": [
     {
-     "text": "Dear Claims Representative,",
+     "text": "Dear Golden State Mutual Insurance Co.,",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "I am writing about the total loss valuation of my 2019 Honda Civic EX, VIN 2HGFC1F35KH654321, with 48,200 miles, and your offer dated 2026-10-14 totaling $17,104.75 with a base value of $17,050.00.",
+     "text": "Re: Claim number CLM-2026-48213, policy number CA-AUTO-7731904, 2019 Honda Civic EX, VIN 2HGFC1F35KH654321, 48,200 mi.",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "After reviewing the valuation, I respectfully decline that offer and submit the counteroffer below, based on the following concerns.",
+     "text": "Thank you for your total loss offer dated 2026-10-14, which totals $17,104.75 and uses a base value of $17,050.00; after careful review, I respectfully decline that offer and submit the counteroffer below.",
      "citations": [
       "claim",
       "counter"
      ]
     },
     {
-     "text": "Comparable C1 fails check 5 (Similar trim, options and mileage, 10 CCR \u00a7 2695.8(b)(2)): it is an LX rather than an EX, has 61,400 miles versus my 48,200 miles, and lacks the Sunroof, Apple CarPlay, and Heated Seats.",
+     "text": "For context, my own account is that another car ran a red light and hit my driver side, I was not hurt, and repairs were quoted at $9,800.",
+     "citations": [
+      "note"
+     ]
+    },
+    {
+     "text": "Comparable C1 does not meet the standard of similar trim, options and mileage under 10 CCR \u00a7 2695.8(b)(2), because it is an LX rather than an EX, has 61,400 mi versus my 48,200 mi, and is missing the Sunroof, Apple CarPlay and Heated Seats.",
      "citations": [
       "check:5:C1"
      ]
     },
     {
-     "text": "Comparable C2 fails check 4 (Identified by VIN, stock number or plate, with seller contact, 10 CCR \u00a7 2695.8(b)(2)) because it has no VIN, stock number or plate and no seller contact.",
+     "text": "Comparable C2 is not identified by VIN, stock number or plate and has no seller contact, as required under 10 CCR \u00a7 2695.8(b)(2).",
      "citations": [
       "check:4:C2"
      ]
     },
     {
-     "text": "Comparable C2 also fails check 5 (Similar trim, options and mileage, 10 CCR \u00a7 2695.8(b)(2)) because it lacks the Sunroof, Apple CarPlay, and Heated Seats.",
+     "text": "Comparable C2 also lacks similar options under 10 CCR \u00a7 2695.8(b)(2), as it is missing the Sunroof, Apple CarPlay and Heated Seats.",
      "citations": [
       "check:5:C2"
      ]
     },
     {
-     "text": "Comparable C3 fails check 3 (Available locally (100 mi) within 90 days, 10 CCR \u00a7 2695.8(b)(2), (b)(4)(A)) because it is 214 miles away and was listed 137 days before the offer.",
+     "text": "Comparable C3 was not available locally within 100 miles and 90 days under 10 CCR \u00a7 2695.8(b)(2), (b)(4)(A), because it is 214 mi away and was listed 137 days before the offer.",
      "citations": [
       "check:3:C3"
      ]
     },
     {
-     "text": "Comparable C3 also fails check 5 (Similar trim, options and mileage, 10 CCR \u00a7 2695.8(b)(2)) because it lacks the Sunroof, Apple CarPlay, and Heated Seats.",
+     "text": "Comparable C3 is likewise missing the Sunroof, Apple CarPlay and Heated Seats, so it does not have similar options under 10 CCR \u00a7 2695.8(b)(2).",
      "citations": [
       "check:5:C3"
      ]
     },
     {
-     "text": "The valuation fails check 7 (Condition deduction only if documented below average, 10 CCR \u00a7 2695.8(b)(2)), since $1,150 was deducted while the condition grade was \"Average\" and no documentation was provided.",
+     "text": "The report applies a condition deduction of $1,150 even though the grade is \"Average\" and no documentation is provided, while 10 CCR \u00a7 2695.8(b)(2) allows a condition deduction only if the vehicle is documented as below average.",
      "citations": [
       "check:7"
      ]
     },
     {
-     "text": "The valuation fails check 8 (Base value is the average of the comparables, 10 CCR \u00a7 2695.8(b)(4)(A)): the C2 mileage adjustment of -400 has the wrong sign given 52,000 versus 48,200 miles, and the average of the adjusted values is $17,266.67, while the report states $17,050.00.",
+     "text": "Under 10 CCR \u00a7 2695.8(b)(4)(A), the base value should be the average of the comparables, yet the C2 mileage adjustment of -400 has the wrong sign (52,000 vs 48,200 mi), and the average of the adjusted values is $17,266.67 rather than the $17,050.00 stated in the report.",
      "citations": [
       "check:8"
      ]
     },
     {
-     "text": "The offer fails check 9 (Offer includes tax, fees and prorated registration, minus deductible, 10 CCR \u00a7 2695.8(b)(1)) because prorated registration is missing.",
+     "text": "The offer also omits prorated registration, which 10 CCR \u00a7 2695.8(b)(1) lists among the items an offer should include along with tax and fees, minus the deductible.",
      "citations": [
       "check:9"
      ]
     },
     {
-     "text": "The offer also fails check 10 (Written explanation provided with the offer, 10 CCR \u00a7 2695.8(b)(4)), as I found no written explanation accompanying it.",
+     "text": "Current local listings show comparable 2019 Honda Civic EX FWD vehicles, including one with 27,670 mi listed at $23,047.00 by BMW of Concord 14 mi away, one with 43,394 mi listed at $15,990.00 by envision motorsport 64 mi away, one with 23,107 mi listed at $22,981.00 by Mistlin Honda 70 mi away, and one with 36,243 mi listed at $23,699.00 by Acura of Modesto 70 mi away.",
      "citations": [
-      "check:10"
+      "listing:JHMFC1F3XKX009872",
+      "listing:19XFC1F38KE210073",
+      "listing:19XFC1F36KE204739",
+      "listing:19XFC1F38KE213250"
      ]
     },
     {
-     "text": "Current local listings for the same model and trim support a higher value, including a 2019 Honda Civic EX FWD with 50,690 miles listed at $23,998.00 by CarMax Newark.",
-     "citations": [
-      "listing:19XFC1F3XKE007427"
-     ]
-    },
-    {
-     "text": "Keyes Hyundai lists a 2019 Honda Civic EX FWD with 38,842 miles at $20,674.00, and Lithia Ford of Klamath Falls lists one with 55,062 miles at $21,201.00.",
-     "citations": [
-      "listing:JHMFC1F31KX010568",
-      "listing:2HGFC1F34KH651544"
-     ]
-    },
-    {
-     "text": "Even higher-mileage examples are priced close to or above your base value, such as one with 78,114 miles listed at $18,914.00 by Dons Auto Center and one with 101,562 miles listed at $16,997.00 by AutoNation Honda 385.",
-     "citations": [
-      "listing:19XFC1F35KE211827",
-      "listing:19XFC1F3XKE201486",
-      "claim"
-     ]
-    },
-    {
-     "text": "Based on 16 current comparable listings, a linear fit of price on mileage indicates a market value of $21,615.00 at 48,200 miles.",
+     "text": "Based on 11 current comparable listings, a linear fit of price on mileage indicates a market value of $20,457.00 at 48,200 mi.",
      "citations": [
       "market"
      ]
     },
     {
-     "text": "Accordingly, I request a revised offer of $23,405.54, consisting of a vehicle value of $21,615.00, sales tax of $2,215.54, and fees of $75.00, less my deductible of $500.00.",
+     "text": "Accordingly, my counteroffer totals $22,128.84, consisting of the vehicle value of $20,457.00, sales tax of $2,096.84 and fees of $75.00, less my deductible of $500.00, which is $5,024.09 above the current offer.",
      "citations": [
       "counter"
      ]
     },
     {
-     "text": "This counteroffer is $6,300.79 above your current offer.",
+     "text": "I respectfully request a revised offer of $22,128.84 for claim number CLM-2026-48213.",
      "citations": [
-      "counter"
+      "counter",
+      "claim"
      ]
     },
     {
-     "text": "Please also include prorated registration in the revised settlement, as noted above.",
+     "text": "Please also provide a written response addressing each of the items above, including the C1, C2 and C3 comparables, the condition deduction, the base value calculation and the prorated registration.",
      "citations": [
+      "check:5:C1",
+      "check:4:C2",
+      "check:3:C3",
+      "check:7",
+      "check:8",
       "check:9"
      ]
     },
     {
-     "text": "I kindly ask that you respond in writing, either issuing the revised offer of $23,405.54 or explaining in writing the basis for any different valuation, including how each concern above was addressed.",
-     "citations": [
-      "counter",
-      "check:10"
-     ]
-    },
-    {
-     "text": "Thank you for your attention to this matter, and I look forward to resolving my claim promptly.",
+     "text": "Thank you for your attention to this matter, and I look forward to your reply.",
      "citations": [
       "claim"
      ]
     },
     {
-     "text": "Sincerely, the Policyholder",
+     "text": "Sincerely,",
+     "citations": [
+      "claim"
+     ]
+    },
+    {
+     "text": "Jordan Rivera",
      "citations": [
       "claim"
      ]

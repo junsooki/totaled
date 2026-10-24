@@ -1,6 +1,10 @@
 """Build backend/app/fixtures/demo_cache.json from real runs saved in the local database.
 
-  python scripts/build_demo_cache.py [--db PATH] [--fetch-missing] [--fetch-crs]
+  python scripts/build_demo_cache.py [--db PATH] [--claims ID ...] [--keep-existing] [--fetch-missing] [--fetch-crs]
+
+--claims         ids of the claims (in the database) that ran live on the sample report; default: the two old ones.
+--keep-existing  keep the market and crs sections of the current demo_cache.json; rebuild only extraction and letters
+                 (no market or CRS lookups).
 
 --fetch-missing  run the Apify searches the scenarios need but the database lacks (paid, capped per run).
 --fetch-crs      call the live CRS sandbox for all personas (test people only).
@@ -22,14 +26,16 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(BACKEND / ".env")
 os.environ.pop("DATABASE_URL", None)  # always read the local SQLite file
 
-# (claim id, label): the two scenarios that ran live on the sample report
-SCENARIOS = [("9a601339636c", "A"), ("5c988dd1cf18", "B")]
+# claims that ran live on the sample report (default; override with --claims)
+DEFAULT_CLAIMS = ["9a601339636c", "5c988dd1cf18"]
 OUT = BACKEND / "app" / "fixtures" / "demo_cache.json"
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=os.environ.get("SQLITE_PATH", str(BACKEND / "data" / "totaled.db")))
+    ap.add_argument("--claims", nargs="+", default=DEFAULT_CLAIMS)
+    ap.add_argument("--keep-existing", action="store_true")
     ap.add_argument("--fetch-missing", action="store_true")
     ap.add_argument("--fetch-crs", action="store_true")
     args = ap.parse_args()
@@ -42,20 +48,24 @@ def main():
 
     conn = sqlite3.connect(args.db)
     claims = {}
-    for cid, label in SCENARIOS:
+    for cid in args.claims:
         row = conn.execute("SELECT data FROM claims WHERE id = ?", (cid,)).fetchone()
         if not row:
-            sys.exit(f"Claim {cid} (scenario {label}) not in {args.db}")
-        claims[label] = json.loads(row[0])
+            sys.exit(f"Claim {cid} not in {args.db}")
+        claims[cid] = json.loads(row[0])
 
     out = {"note": "Saved results of real runs; built by backend/scripts/build_demo_cache.py. "
                    "Replaces a paid call only when the same input recurs. DEMO_CACHE=0 turns it off.",
            "market": {}, "extraction": {}, "letters": {}, "crs": {"credit": {}, "seller": {}}}
 
-    # Extraction: the raw Claude read had no ZIP; the user typed it later.
+    if args.keep_existing:
+        old = json.loads(OUT.read_text())
+        out["market"], out["crs"] = old["market"], old["crs"]
+
+    # Extraction: the raw Claude read had no ZIP or note; the user typed those later.
     first = None
     for label, d in claims.items():
-        raw = dict(d["claim"], owner_zip="")
+        raw = dict(d["claim"], owner_zip="", loss_note=None)
         pdf_key = demo_cache.pdf_hash(__import__("base64").b64decode(d["pdf"]))
         if first is None:
             first = raw
@@ -73,7 +83,7 @@ def main():
         out["letters"][demo_cache.evidence_hash(d["evidence"])] = {"sentences": sents}
         print(f"letter {label}: {len(sents)} sentences")
 
-    # Market searches both scenarios use
+    # Market searches the claims use
     needed = {}  # key -> (description, search arguments)
     for label, d in claims.items():
         v, z = d["claim"]["vehicle"], d["claim"]["owner_zip"]
@@ -81,7 +91,7 @@ def main():
             args_ = (v["make"], v["model"], v["year"], y2, z, LOCAL_RADIUS_MI)
             needed[comps.run_input_and_key(*args_)[1]] = (f"{label} {what} zip={z!r}", args_)
     missing = []
-    for key, (what, _) in needed.items():
+    for key, (what, _) in ({} if args.keep_existing else needed).items():
         hit = db.cache_get(key)
         if not hit:
             missing.append(key)
@@ -92,7 +102,7 @@ def main():
             res = comps.search(*args_)
             print(f"fetched {key} ({what}): source={res['source']}, {len(res['listings'])} listings, "
                   f"capped at ${comps.MAX_CHARGE_USD} per run")
-    for key, (what, _) in needed.items():
+    for key, (what, _) in ({} if args.keep_existing else needed).items():
         hit = db.cache_get(key)
         if hit:
             out["market"][key] = {"at": hit[0], "listings": hit[1]}
