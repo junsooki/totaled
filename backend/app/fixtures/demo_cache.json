@@ -12000,5 +12000,87 @@
     "saved_at": "2026-10-24T20:32:45.695148+00:00"
    }
   }
+ },
+ "documents": {
+  "aea8647cce60c89abc01d05a367259d516a30ea590d71a85bfd908d7ecc36512": {
+   "fields": [
+    {
+     "key": "insurer",
+     "value": "Golden State Mutual Insurance Co.",
+     "page": 1,
+     "quote": "Golden State Mutual Insurance Co."
+    },
+    {
+     "key": "policy_number",
+     "value": "CA-AUTO-7731904",
+     "page": 1,
+     "quote": "Policy Number: CA-AUTO-7731904"
+    },
+    {
+     "key": "collision_deductible",
+     "value": "250",
+     "page": 1,
+     "quote": "Collision Coverage Deductible: $250"
+    },
+    {
+     "key": "rental_daily_limit",
+     "value": "40",
+     "page": 1,
+     "quote": "Rental Reimbursement: $40 per day, up to $1,200 per loss"
+    },
+    {
+     "key": "rental_max_total",
+     "value": "1200",
+     "page": 1,
+     "quote": "Rental Reimbursement: $40 per day, up to $1,200 per loss"
+    },
+    {
+     "key": "gap_coverage",
+     "value": "no",
+     "page": 1,
+     "quote": "Loan/Lease Gap Coverage: Not purchased"
+    },
+    {
+     "key": "appraisal_clause",
+     "value": "\"If we and you do not agree on the amount of loss, either may demand an appraisal of the loss\" \u2014 each party selects and pays its own appraiser, the two appraisers select an umpire, and umpire expenses are shared equally.",
+     "page": 2,
+     "quote": "If we and you do not agree on the amount of loss, either may demand an appraisal of the loss."
+    }
+   ]
+  },
+  "7a4bad934b3e3059935a4cf5d793f687821635377b19e6ee95f35b71a4750fad": {
+   "fields": [
+    {
+     "key": "insurer",
+     "value": "Golden State Mutual Insurance Co.",
+     "page": 1,
+     "quote": "Golden State Mutual Insurance Co."
+    },
+    {
+     "key": "letter_date",
+     "value": "2026-10-14",
+     "page": 1,
+     "quote": "Date: October 14, 2026"
+    },
+    {
+     "key": "claim_number",
+     "value": "CLM-2026-48213",
+     "page": 1,
+     "quote": "Claim Number: CLM-2026-48213"
+    },
+    {
+     "key": "offer_total",
+     "value": "17104.75",
+     "page": 1,
+     "quote": "our settlement offer is $17,104.75, which reflects the actual cash value, sales tax and fees,"
+    },
+    {
+     "key": "deductible",
+     "value": "500.00",
+     "page": 1,
+     "quote": "less your deductible of $500.00."
+    }
+   ]
+  }
  }
 }
