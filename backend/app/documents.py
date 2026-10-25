@@ -10,7 +10,7 @@ from typing import List, Optional
 
 import fitz
 
-from . import ai
+from . import ai, demo_cache
 from .schemas import Claim
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -27,7 +27,10 @@ def sample(kind: str) -> bytes:
 
 def read(pdf: bytes, kind: str, is_sample: bool) -> dict:
     """Fields with their page and quote, keeping only quotes code can find on that page."""
-    if ai.available():
+    saved = demo_cache.document(pdf)  # a saved real Claude read of this exact document (the samples)
+    if saved:
+        fields, by = saved["fields"], "claude (saved demo run)"
+    elif ai.available():
         fields, by = [f.model_dump() for f in ai.read_document(pdf, kind).fields], "claude"
     elif is_sample:
         fields, by = json.loads((FIXTURES / "sample_documents.json").read_text())[kind], "sample fixture (Claude not configured)"

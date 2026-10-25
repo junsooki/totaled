@@ -2,7 +2,7 @@
 import re
 from typing import List
 
-from . import ai
+from . import ai, documents
 from .checks import CHECKS
 from .letter import build_evidence
 from .schemas import Claim
@@ -20,6 +20,13 @@ def sources(data: dict) -> List[dict]:
     out.append({"id": "deadline", "fact": f"Deadline to tell the insurer you cannot buy a comparable car for the "
                                           f"settlement: {audit['deadline']['date']} (35 days after the offer, {RULE}(c))",
                 "amounts": []})
+    for c in documents.crosscheck(claim, data.get("documents") or []):
+        if c["status"] == "needs_document":
+            continue
+        quotes = "; ".join(f"{f['name']} page {f['page']}: \"{f['quote']}\"" for f in c["sources"])
+        fact = f"{c['name']} ({c['status'].replace('_', ' ')}): {c['detail']}" + (f" Source: {quotes}" if quotes else "")
+        out.append({"id": f"doc:{re.sub(r'[^a-z]+', '-', c['name'].lower()).strip('-')}", "fact": fact,
+                    "amounts": [float(m.replace(",", "")) for m in ai.DOLLARS.findall(fact)]})
     p = (data.get("payout") or {})
     np_ = p.get("at_counteroffer") or p.get("at_offer")
     if np_:

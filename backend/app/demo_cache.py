@@ -38,6 +38,10 @@ def _get(section: dict, key: str) -> Optional[dict]:
     return copy.deepcopy(hit) if hit else None  # callers may edit what they get
 
 
+def document(pdf: bytes) -> Optional[dict]:
+    return _get(_load().get("documents", {}), pdf_hash(pdf))
+
+
 def market(key: str) -> Optional[dict]:
     return _get(_load().get("market", {}), key)
 
