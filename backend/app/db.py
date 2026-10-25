@@ -5,6 +5,7 @@ SQLite by default; Postgres (e.g. Supabase) when DATABASE_URL is set.
 import json
 import logging
 import os
+import queue
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -17,11 +18,43 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", Path(__file__).resolve().parent.parent / "data" / "totaled.db"))
 CLAIM_RETENTION_DAYS = max(1, int(os.environ.get("CLAIM_RETENTION_DAYS", "30")))
 
+if DATABASE_URL:
+    import psycopg
+
+_idle = queue.LifoQueue(maxsize=10)  # open Postgres connections, reused so each query skips a fresh TLS handshake
+
+
+class _Pooled:
+    """A Postgres connection whose close() puts it back in _idle instead of closing it."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        conn = self._conn
+        try:
+            if conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+                conn.rollback()
+            _idle.put_nowait(conn)
+        except (psycopg.Error, queue.Full):
+            conn.close()
+
 
 def _connect():
     if DATABASE_URL:
-        import psycopg
-        return psycopg.connect(DATABASE_URL, autocommit=True, prepare_threshold=None), "%s"  # pooler-safe
+        while True:
+            try:
+                conn = _idle.get_nowait()
+            except queue.Empty:
+                return _Pooled(psycopg.connect(DATABASE_URL, autocommit=True, prepare_threshold=None)), "%s"  # pooler-safe
+            try:
+                conn.execute("")  # drop a connection the server closed while it sat idle
+                return _Pooled(conn), "%s"
+            except psycopg.Error:
+                conn.close()
     SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(SQLITE_PATH, isolation_level=None), "?"
 

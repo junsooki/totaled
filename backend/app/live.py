@@ -13,6 +13,7 @@ import requests
 HOST = os.environ.get("SPACETIME_HOST", "https://maincloud.spacetimedb.com")
 DB = os.environ.get("SPACETIME_DB")
 TOKEN = os.environ.get("SPACETIME_TOKEN")
+_http = requests.Session()  # keep-alive: skip a TLS handshake on every call
 
 
 def enabled() -> bool:
@@ -21,8 +22,8 @@ def enabled() -> bool:
 
 def _call(reducer: str, args: list, strict: bool = False):
     try:
-        r = requests.post(f"{HOST}/v1/database/{DB}/call/{reducer}", json=args,
-                          headers={"Authorization": f"Bearer {TOKEN}"}, timeout=10)
+        r = _http.post(f"{HOST}/v1/database/{DB}/call/{reducer}", json=args,
+                       headers={"Authorization": f"Bearer {TOKEN}"}, timeout=10)
         r.raise_for_status()
     except requests.RequestException as e:
         if strict:  # the caller depends on this write (auctions)
@@ -33,8 +34,8 @@ def _call(reducer: str, args: list, strict: bool = False):
 
 def sql(query: str) -> List[dict]:
     """Run a read query and return rows as dicts."""
-    r = requests.post(f"{HOST}/v1/database/{DB}/sql", data=query,
-                      headers={"Authorization": f"Bearer {TOKEN}"}, timeout=10)
+    r = _http.post(f"{HOST}/v1/database/{DB}/sql", data=query,
+                   headers={"Authorization": f"Bearer {TOKEN}"}, timeout=10)
     r.raise_for_status()
     result = r.json()[0]
     names = [(e.get("name") or {}).get("some") for e in result["schema"]["elements"]]

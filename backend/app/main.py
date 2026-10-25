@@ -31,6 +31,7 @@ from .schemas import Claim  # noqa: E402
 from .valuation import bridge, comparable_listings, counteroffer, fair_value  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+DEMO_UPLOAD_NAME = "evaluation_1.pdf"  # an upload with this name gets the precached sample run (its own pages are kept)
 REOPEN_DAYS = 35
 
 app = FastAPI(title="Toto")
@@ -120,6 +121,8 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
         if pdfs and len(files) > 1:
             raise HTTPException(400, "Upload one PDF, or photos of the pages, not both")
         pdf, sample = (pdfs[0] if pdfs else _photos_to_pdf(blobs)), False
+        if pdfs and os.path.basename(files[0].filename or "").lower() == DEMO_UPLOAD_NAME:
+            sample = True  # keep the uploaded pages, but serve the precached sample run below
     else:
         pdf, sample = (FIXTURES / "sample_report.pdf").read_bytes(), True
 
@@ -135,7 +138,8 @@ async def create_claim(files: Optional[List[UploadFile]] = File(None)):
     except Exception:
         raise HTTPException(415, "Could not read the uploaded PDF")
 
-    saved = demo_cache.extraction(pdf)  # a saved real Claude read of this exact report works without a key too
+    # a saved real Claude read of this exact report (or of the sample, for the demo upload) works without a key too
+    saved = demo_cache.extraction((FIXTURES / "sample_report.pdf").read_bytes() if sample else pdf)
     if saved:
         claim, by = saved, "claude (saved demo run)"
     elif ai.available():
