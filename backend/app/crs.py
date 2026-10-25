@@ -153,8 +153,8 @@ def seller_check(pid: str, demo: bool) -> dict:
                 "flags": _flags(idv, records), "source": "demo"}
 
     saved = demo_cache.seller(pid)
-    if saved:
-        return dict(saved, source="cached")
+    if saved:  # saved runs predate red flags, so derive them by the same rule as a live check
+        return dict(saved, flags=_flags(saved["identity"], saved["records"]), source="cached")
 
     sr = _post("/transunion/identity-manager-verification/basic", p["idv_body"])
     msgs = (((sr.get("addOnProducts") or [{}])[0].get("idManagerVerification") or {}).get("messages")) or []
