@@ -199,3 +199,54 @@ def case_package(data: dict, events: List[dict]) -> str:
         md += ["", "## Approved counteroffer letter", ""]
         md += [s["text"] for s in letter["sentences"]]
     return "\n".join(md) + "\n"
+
+
+# How each failed check and each lawyer trigger sounds when read aloud.
+SPOKEN_CHECK = {
+    1: "comparables that are a different make or model", 2: "comparables that are an older model year",
+    3: "comparables too far away or listed too long ago", 4: "comparables with no VIN or seller contact",
+    5: "trim, options or mileage that don't match", 6: "adjustments that aren't itemized",
+    7: "an undocumented condition deduction", 8: "a base value that doesn't average the comparables",
+    9: "missing taxes, fees or registration", 10: "no written explanation",
+}
+SPOKEN_REASON = {
+    "injured": "someone was injured", "fault_disputed": "fault is disputed",
+    "rideshare_or_commercial": "a rideshare or commercial vehicle was involved",
+    "other_at_fault_drivers": "other drivers may share the fault",
+}
+
+
+def _say_usd(x: float) -> str:
+    return f"{x:,.0f} dollars"
+
+
+def briefing(data: dict) -> str:
+    """About a minute of speech for an attorney, built in code from the case file. Opens by saying it is an AI voice."""
+    claim, audit = Claim(**data["claim"]), data["audit"]
+    v, o, co, fv = claim.vehicle, claim.offer, audit["counteroffer"], audit["market"]["fair_value"]
+    plan = if_no(data)
+    failed = _failed(audit)
+    owner = claim.policyholder_name
+    parts = [
+        "This is an AI-generated voice reading a case summary prepared by Totaled"
+        + (f" for {owner}" if owner else "") + ". It is not legal advice and it does not rate the case.",
+        f"The car is a {v.year} {v.make} {v.model}, declared a total loss in California. "
+        f"The insurer offered {_say_usd(o.total)} on {date.fromisoformat(o.offer_date):%B %-d}.",
+    ]
+    if failed:
+        parts.append(f"The valuation fails {len(failed)} of the {len(CHECKS)} checks under California's total loss rule, "
+                     f"including {'; '.join(SPOKEN_CHECK[n] for n in failed[:3])}.")
+    if fv and co:
+        parts.append(f"Current listings for the same car put its value near {_say_usd(fv['estimate'])}. "
+                     f"The owner asked for {_say_usd(co['total'])}, which is {_say_usd(co['gap'])} more than the offer.")
+    dated = [s for s in plan["steps"] if s["date"]]
+    if dated:
+        parts.append("Dates: " + "; ".join(f"{s['step'].lower()} by {date.fromisoformat(s['date']):%B %-d}" for s in dated) + ".")
+    situation = data.get("situation") or {}
+    reasons = [SPOKEN_REASON[k] for k in SPOKEN_REASON if situation.get(k)]
+    if co and co["gap"] > SMALL_CLAIMS_LIMIT:
+        reasons.append("the gap is over the small claims limit")
+    if reasons:
+        parts.append(f"The owner is talking to an attorney because {', and '.join(reasons)}.")
+    parts.append("The written case package lists every fact with its source, and what is still missing.")
+    return " ".join(parts)

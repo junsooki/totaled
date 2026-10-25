@@ -22,8 +22,11 @@ async def search(question: str) -> Dict:
 
     index_name = os.environ.get("MOSS_INDEX_NAME", "totaled-voice-guide")
     if _client is None:
+        # Model and index files go under /tmp: serverless hosts (Vercel) can't write to the default ~/.cache.
+        os.environ.setdefault("MOSS_MODEL_CACHE_DIR", "/tmp/moss-models")
         _client = MossClient(project_id=os.environ["MOSS_PROJECT_ID"],
-                             project_key=os.environ["MOSS_PROJECT_KEY"])
+                             project_key=os.environ["MOSS_PROJECT_KEY"],
+                             cache_path=os.environ.get("MOSS_CACHE_PATH", "/tmp/moss-cache"))
     if not _loaded:
         async with _load_lock:
             if not _loaded:
