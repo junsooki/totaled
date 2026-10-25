@@ -1,20 +1,19 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import AgentWork from "@/components/AgentWork";
+import AskBar from "@/components/AskBar";
 import Audit from "@/components/Audit";
+import IfNo from "@/components/IfNo";
 import Letter from "@/components/Letter";
 import Payout from "@/components/Payout";
-import Rental from "@/components/Rental";
 import Replace from "@/components/Replace";
 import Upload from "@/components/Upload";
 import { Button, Notice, Stat, StepCard, Stepper, SummaryPanel, type SummaryRow } from "@/components/ui";
 import { call, Json, post, usd } from "@/lib/api";
 
-const STEP_LABELS = ["Upload", "Audit", "Counteroffer", "Net payout", "Rental and car", "Summary"];
+const STEP_LABELS = ["Upload", "Audit", "Counteroffer", "Net payout", "Next car", "Summary"];
 
-const LiveAgentFeed = dynamic(() => import("@/components/live/LiveBits").then((m) => m.LiveAgentFeed), { ssr: false });
-const LIVE = !!process.env.NEXT_PUBLIC_SPACETIME_DB;
 
 export default function Home() {
   const [status, setStatus] = useState<Json | null>(null);
@@ -26,13 +25,12 @@ export default function Home() {
   const [approved, setApproved] = useState(false);
   const [payout, setPayout] = useState<Json | null>(null);
   const [results, setResults] = useState<Json | null>(null);
-  const [cap, setCap] = useState("1000");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<{ msg: string; at: number } | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [cur, setCur] = useState(0);
   const [wide, setWide] = useState(false);
-  // Steps the user has opened. Letter, Payout and rental/car stay mounted once opened so Back keeps their data.
+  // Steps the user has opened. Letter, Payout and Next car stay mounted once opened so Back keeps their data.
   const [seen, setSeen] = useState<Record<number, boolean>>({});
   const auditStarted = useRef(false);
   const prevCur = useRef(0);
@@ -94,17 +92,11 @@ export default function Home() {
 
   // Gating: a step is unlocked when its prerequisite exists.
   const unlocked = [true, !!claim, !!audit, approved, !!payout, !!claim];
-  const done = [!!claim, !!audit, approved, !!payout, !!(results?.rental || results?.purchase), false];
+  const done = [!!claim, !!audit, approved, !!payout, !!results?.purchase, false];
   const steps = STEP_LABELS.map((label, i) => ({ label, done: done[i], locked: !unlocked[i] }));
   const canContinue = [!!claim, !!audit, approved, !!payout, !!payout, false][cur];
   const go = (i: number) => unlocked[i] && show(i);
   const next = () => canContinue && show(cur + 1);
-
-  const trackerLink = process.env.NEXT_PUBLIC_SPACETIME_DB && id && (
-    <a href={`/track?id=${id}`} target="_blank" rel="noreferrer">
-      Open live tracker
-    </a>
-  );
 
   const nav = (nextLabel?: string) => (
     <>
@@ -132,9 +124,8 @@ export default function Home() {
             ]
           : []),
         ...(audit ? [{ label: "Letter", value: approved ? "Approved" : letter ? "Drafted, needs your approval" : "Not drafted yet" }] : []),
-        ...(results?.rental ? [{ label: "Rental hold", value: usd(results.rental.total) }] : []),
         ...(results?.purchase ? [{ label: "Car deposit hold", value: usd(results.purchase.total) }] : []),
-        ...(payout ? [{ label: "Spending cap left", value: cap.trim() !== "" && Number.isFinite(Number(cap)) ? usd(Math.max(0, Number(cap) - (results?.rental?.total ?? 0) - (results?.purchase?.total ?? 0))) : "—" }] : []),
+        ...(results?.purchase ? [{ label: "Spending cap left", value: usd(results.purchase.remaining_under_cap) }] : []),
       ]
     : [];
 
@@ -146,11 +137,11 @@ export default function Home() {
       <header className="border-b-4 border-brand">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-4 sm:px-6">
           <span className="font-serif text-2xl font-semibold tracking-tight text-brand">Totaled</span>
-          <p className="text-base text-muted">Insurers use software to value your totaled car. Now you have software to check theirs.</p>
+          <p className="text-base text-muted">Challenge the offer. See what you can spend. Find your next car.</p>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-6 pt-6 sm:px-6 sm:pb-8">
+      <div className={`mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-6 sm:px-6 ${audit ? "pb-40" : "pb-6 sm:pb-8"}`}>
       {!status && statusError && (
         <div className="mb-6">
           <Notice tone="bad">
@@ -165,7 +156,6 @@ export default function Home() {
         {showPanel && (
           <div className="space-y-6 lg:sticky lg:top-6 lg:order-2 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:border-l lg:border-line lg:pl-8">
             <SummaryPanel rows={summaryRows} />
-            {LIVE && id && <LiveAgentFeed claimId={id} />}
           </div>
         )}
 
@@ -181,12 +171,14 @@ export default function Home() {
               footer={claim ? nav("Continue to audit") : undefined}
             >
               {claim ? (
-                <div>
+                <div className="space-y-6">
+                  {id && <AgentWork id={id} agent="Reader" active={false} defaultOpen={false} />}
+                  <div>
                   <p className="font-serif text-[1.75rem] font-semibold text-ink">{v.year} {v.make} {v.model} {v.trim}</p>
                   <p className="mt-2 text-lg text-muted">
                     Offer of {usd(claim.offer.total, true)} with {claim.comparables.length} comparable cars. Your claim is confirmed.
                   </p>
-                  {trackerLink && <p className="mt-3">{trackerLink}</p>}
+                  </div>
                 </div>
               ) : (
                 <Upload
@@ -208,8 +200,9 @@ export default function Home() {
               subtitle="We test the insurer's numbers and compare them with cars for sale near you."
               footer={nav("Continue to counteroffer")}
             >
+              <div className="mb-8"><AgentWork id={id} agent="Appraiser" active={busy === "audit"} defaultOpen={false} /></div>
               {audit ? (
-                <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} />
+                <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} voiceEnabled={!!status?.voice_assistant} />
               ) : auditError ? (
                 <div>
                   <Notice tone="bad" title="The audit did not finish">{auditError}</Notice>
@@ -217,9 +210,7 @@ export default function Home() {
                     <Button disabled={busy === "audit"} onClick={runAudit}>Try again</Button>
                   </div>
                 </div>
-              ) : (
-                <p role="status" className="text-lg text-muted">Running checks and pulling live listings. This can take a moment.</p>
-              )}
+              ) : null}
             </StepCard>
           )}
 
@@ -230,8 +221,12 @@ export default function Home() {
                 subtitle="We write a letter that asks the insurer for a fair value. Read it, then approve it."
                 footer={nav("Continue to net payout")}
               >
+                <div className="mb-8"><AgentWork id={id} agent="Negotiator" active={busy === "letter"} defaultOpen={!letter} /></div>
                 {letter ? (
-                  <Letter key={`letter-${id}`} id={id} letter={letter} onApproved={() => { setApproved(true); refreshResults(); }} />
+                  <div className="space-y-10">
+                    <Letter key={`letter-${id}`} id={id} letter={letter} onApproved={() => { setApproved(true); refreshResults(); }} />
+                    {approved && <IfNo key={`ifno-${id}`} id={id} />}
+                  </div>
                 ) : (
                   <Button disabled={busy === "letter"} onClick={() => step("letter", async () => {
                     setLetter(await post(`/api/claims/${id}/letter`));
@@ -248,7 +243,7 @@ export default function Home() {
               <StepCard
                 title="What you would take home"
                 subtitle="See your payout after taxes, fees and any loan, at the offer and at our counteroffer."
-                footer={nav("Continue to rental and next car")}
+                footer={nav("Continue to your next car")}
               >
                 <Payout key={`payout-${id}`} id={id} personas={personas} onDone={(p) => { setPayout(p); refreshResults(); }} />
               </StepCard>
@@ -258,18 +253,11 @@ export default function Home() {
           {(cur === 4 || seen[4]) && id && payout && (
             <div hidden={cur !== 4}>
             <StepCard
-              title="Rental and your next car"
-              subtitle="Get a ride while you wait, then find a car to replace yours. Both stay under your spending cap."
+              title="Your next car"
+              subtitle="Cars ranked inside your real budget. Every seller is checked and every dollar stays inside the limits you set."
               footer={nav("Continue to summary")}
             >
-              <h2>A rental for now</h2>
-              <div className="mt-4">
-                <Rental key={`rental-${id}`} id={id} cap={cap} setCap={setCap} onHeld={() => refreshResults()} />
-              </div>
-              <h2 className="mt-12 border-t border-line pt-8">Your next car</h2>
-              <div className="mt-4">
-                <Replace key={`replace-${id}`} id={id} personas={personas} cap={cap} setCap={setCap} onPurchased={() => refreshResults()} />
-              </div>
+              <Replace key={`replace-${id}`} id={id} personas={personas} onPurchased={() => refreshResults()} />
             </StepCard>
             </div>
           )}
@@ -286,7 +274,6 @@ export default function Home() {
                     <Stat label="Dollars at stake" value={usd(results.dollars_at_stake)} tone="text-brand" />
                     <Stat label="Checks failed" value={results.checks_failed} />
                     <Stat label="Upload to approved letter" value={results.minutes_to_letter != null ? `${results.minutes_to_letter} min` : "—"} />
-                    <Stat label="Rental held" value={results.rental ? usd(results.rental.total) : "—"} />
                     <Stat label="Replacement held" value={results.purchase ? usd(results.purchase.total) : "—"} />
                   </div>
                   <details className="mt-6 text-base text-muted">
@@ -301,7 +288,6 @@ export default function Home() {
               ) : (
                 <p className="text-lg text-muted">Run the audit to see your numbers.</p>
               )}
-              {trackerLink && <p className="mt-6">{trackerLink}</p>}
             </StepCard>
           )}
         </div>
@@ -310,7 +296,7 @@ export default function Home() {
       <footer className="mt-12 border-t border-line pt-4 text-sm text-muted">
         {status ? (
           <p className="text-sm">
-            Data: Apify {status.apify} · CRS {status.crs} · Claude {status.claude} · Database {status.database}
+            Data: Apify {status.apify} · CRS {status.crs} · Claude {status.claude} · Moss {status.moss} · Database {status.database}
           </p>
         ) : (
           <p className="text-sm">{statusError ? "Server status unavailable" : "Connecting…"}</p>
@@ -318,6 +304,7 @@ export default function Home() {
         <p className="mt-1 text-sm">California only · not legal advice</p>
       </footer>
       </div>
+      {id && audit && <AskBar id={id} />}
     </div>
   );
 }

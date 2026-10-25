@@ -153,6 +153,38 @@ def draft_letter(evidence: List[dict]) -> Letter:
     return response.parsed_output
 
 
+def answer_claim_question(question: str, claim_context: str, retrieved_context: str) -> str:
+    """Answer a spoken claim question using only the supplied claim facts and Moss references."""
+    client = anthropic.Anthropic()
+    response = client.beta.messages.create(
+        model=MODEL,
+        max_tokens=450,
+        output_config={"effort": "low"},
+        messages=[{
+            "role": "user",
+            "content": f"""You are Totaled's concise voice guide. Answer in natural spoken language, usually 1-3 sentences.
+Use only the claim facts and guidance below. Do not invent facts, deadlines, legal conclusions, or dollar amounts.
+If the information is insufficient, say what is missing. Explain estimates as estimates and say this is not legal advice.
+Never take an action: the user must approve letters, selections, and holds themselves.
+
+Claim facts:
+{claim_context}
+
+Retrieved guidance from Moss:
+{retrieved_context or "No relevant guidance was found."}
+
+User question: {question}"""
+        }],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError("The voice guide could not answer that question")
+    answer = "".join(block.text for block in response.content if block.type == "text").strip()
+    if not answer:
+        raise RuntimeError("The voice guide returned an empty answer")
+    return answer
+
+
 DOLLARS = re.compile(r"\$\s?([\d,]+(?:\.\d{1,2})?)")
 
 
@@ -173,3 +205,85 @@ def citation_check(letter: Letter, evidence: List[dict]) -> List[dict]:
                 problems.append(f"${m} is not in the evidence")
         out.append({"text": s.text, "citations": s.citations, "ok": not problems, "problems": problems})
     return out
+
+
+class Answer(BaseModel):
+    found: bool  # false when the sources do not answer the question
+    sentences: List[Sentence]
+
+
+ASK_PROMPT = """Answer the owner's question about their total loss claim using only the sources below.
+- Every sentence must cite at least one source id in its citations list.
+- Use only dollar amounts that appear in the sources, written exactly as given. Never compute new amounts.
+- If the sources do not answer the question, set found to false and return no sentences.
+- Plain words, at most 4 sentences. Do not give legal advice, rate the case or predict an outcome.
+
+Sources (id: fact):
+{sources}
+
+Question: {question}"""
+
+
+def answer_question(question: str, sources: List[dict]) -> Answer:
+    client = anthropic.Anthropic()
+    lines = "\n".join(f"{s['id']}: {s['fact']}" for s in sources)
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=4000,
+        output_config={"effort": "low"},
+        output_format=Answer,
+        messages=[{"role": "user", "content": ASK_PROMPT.format(sources=lines, question=question)}],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not answer (stop_reason={response.stop_reason})")
+    return response.parsed_output
+
+
+class StoryEvent(BaseModel):
+    when: Optional[str] = None  # as the person said it ("Oct 3", "two days later"); null if they gave no time
+    event: str
+    quote: str  # the person's exact words this event comes from
+
+
+class StoryAnswer(BaseModel):
+    key: str  # injured | fault_disputed | rideshare_or_commercial | other_at_fault_drivers
+    answer: bool
+    quote: str
+
+
+class StoryRead(BaseModel):
+    timeline: List[StoryEvent]
+    answers: List[StoryAnswer]
+    letter_note: Optional[str] = None  # a neutral sentence about the loss the owner may choose to send
+
+
+STORY_PROMPT = """A car owner in California told us, in their own words, what happened in the accident that totaled
+their car. Read their account. Use only what they said; never infer, guess or add.
+- timeline: the events in order. "when" is the time exactly as they said it, or null. Each "quote" is copied
+  word for word from their account.
+- answers: only for questions their account clearly answers, each with the exact words that answer it:
+  injured (was anyone injured), fault_disputed (does anyone dispute who was at fault),
+  rideshare_or_commercial (was a rideshare or commercial vehicle involved),
+  other_at_fault_drivers (could other drivers share the fault). Leave out any question they did not answer.
+- letter_note: at most two short sentences the owner could send to their insurer, stating only neutral facts
+  about the loss (date, place, what happened to the car). Never mention fault, injuries, admissions or anything
+  they did not say. Null if there is nothing neutral to state.
+
+Their account:
+{story}"""
+
+
+def read_story(story: str) -> StoryRead:
+    client = anthropic.Anthropic()
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=4000,
+        output_config={"effort": "low"},
+        output_format=StoryRead,
+        messages=[{"role": "user", "content": STORY_PROMPT.format(story=story)}],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not read the account (stop_reason={response.stop_reason})")
+    return response.parsed_output

@@ -1,9 +1,22 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { API } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { fileUrl } from "@/lib/api";
 
 export type Match = { page: number; x: number; y: number; w: number; h: number };
+
+// The page image needs the claim's access token, which a plain <img src> cannot send.
+function PageImage({ path, alt }: { path: string; alt: string }) {
+  const [src, setSrc] = useState<string>();
+  useEffect(() => {
+    let url: string | undefined;
+    let live = true;
+    fileUrl(path).then((u) => { url = u; if (live) setSrc(u); else URL.revokeObjectURL(u); }).catch(() => {});
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [path]);
+  // eslint-disable-next-line @next/next/no-img-element
+  return src ? <img src={src} alt={alt} className="block w-full" /> : <div className="aspect-[8.5/11] w-full bg-line/30" aria-hidden="true" />;
+}
 
 export default function ReportPane({
   id, pageCount, matches, notFound,
@@ -30,8 +43,7 @@ export default function ReportPane({
       <div ref={box} className="relative flex-1 space-y-4 overflow-y-auto p-4">
         {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
           <div key={n} ref={(el) => { pages.current[n] = el; }} className="relative border border-line">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${API}/api/claims/${id}/page/${n}.png`} alt={`Report page ${n} of ${pageCount}`} className="block w-full" loading="lazy" />
+            <PageImage path={`/api/claims/${id}/page/${n}.png`} alt={`Report page ${n} of ${pageCount}`} />
             {matches.filter((m) => m.page === n).map((m, j) => (
               <div
                 key={j}

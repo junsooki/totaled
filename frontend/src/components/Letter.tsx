@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { API, Json, post } from "@/lib/api";
+import { download, Json, post } from "@/lib/api";
 import { Button, Notice } from "./ui";
 
 export default function Letter({ id, letter, onApproved }: { id: string; letter: Json; onApproved: () => void }) {
@@ -39,16 +39,7 @@ export default function Letter({ id, letter, onApproved }: { id: string; letter:
     setPdfBusy(true);
     setPdfError(null);
     try {
-      const res = await fetch(`${API}/api/claims/${id}/letter.pdf`);
-      if (!res.ok) throw new Error("Could not prepare the PDF. Try again.");
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "counteroffer-letter.pdf";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await download(`/api/claims/${id}/letter.pdf`, "counteroffer-letter.pdf");
     } catch (e) {
       setPdfError((e as Error).message || "Could not prepare the PDF. Try again.");
     } finally {
