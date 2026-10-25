@@ -13,12 +13,12 @@ def available() -> bool:
     return bool(os.environ.get("CARTESIA_API_KEY"))
 
 
-def speak(text: str) -> bytes:
+def speak(text: str, voice: str = None) -> bytes:
     r = requests.post(URL, timeout=60, headers={
         "X-API-Key": os.environ["CARTESIA_API_KEY"], "Cartesia-Version": VERSION, "Content-Type": "application/json",
     }, json={
         "model_id": MODEL, "transcript": text, "language": "en",
-        "voice": {"mode": "id", "id": VOICE},
+        "voice": {"mode": "id", "id": voice or VOICE},
         "output_format": {"container": "mp3", "sample_rate": 44100, "bit_rate": 128000},
     })
     if r.status_code != 200:

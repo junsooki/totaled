@@ -5,6 +5,7 @@ import AgentWork from "@/components/AgentWork";
 import AskBar from "@/components/AskBar";
 import Documents from "@/components/Documents";
 import Audit from "@/components/Audit";
+import CallPlayback from "@/components/CallPlayback";
 import IfNo from "@/components/IfNo";
 import Letter from "@/components/Letter";
 import Payout from "@/components/Payout";
@@ -241,6 +242,7 @@ export default function Home() {
                 {letter ? (
                   <div className="space-y-10">
                     <Letter key={`letter-${id}`} id={id} letter={letter} onApproved={() => { setApproved(true); refreshResults(); }} />
+                    {approved && <CallPlayback key={`call-sent-${id}`} id={id} which="sent" />}
                     {approved && <IfNo key={`ifno-${id}`} id={id} />}
                   </div>
                 ) : (

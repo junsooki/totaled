@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { call, download, Json } from "@/lib/api";
 import Briefing from "./Briefing";
+import CallPlayback from "./CallPlayback";
 import { Button, Notice } from "./ui";
 
 const linkCls = "font-semibold text-brand underline underline-offset-4 hover:text-brand-dark";
@@ -44,6 +45,8 @@ export default function IfNo({ id }: { id: string }) {
           </li>
         ))}
       </ol>
+
+      <CallPlayback id={id} which="denied" />
 
       <details className="border-2 border-ink p-4">
         <summary className="cursor-pointer text-base font-semibold text-ink">Department of Insurance complaint draft</summary>

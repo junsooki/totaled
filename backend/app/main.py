@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, ask, cartesia, comps, crs, db, demo_cache, documents, live, moss_voice, playbook, story  # noqa: E402
+from . import ai, ask, call_audio, call_routes, cartesia, comps, crs, db, demo_cache, documents, live, moss_voice, playbook, story  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -537,6 +537,9 @@ def _require_approved(cid: str) -> dict:
     return data
 
 
+app.include_router(call_routes.build(_require_approved))
+
+
 @app.get("/api/claims/{cid}/if-no")
 def if_they_say_no(cid: str):
     return playbook.if_no(_require_approved(cid))
@@ -552,19 +555,22 @@ def case_package(cid: str):
 @app.get("/api/claims/{cid}/briefing")
 def briefing_script(cid: str):
     """The spoken briefing's script, for the owner to read before any audio is made."""
-    return {"script": playbook.briefing(_require_approved(cid)), "voice": cartesia.available()}
+    script = playbook.briefing(_require_approved(cid))
+    return {"script": script, "voice": cartesia.available() or call_audio.saved("briefing", script) is not None}
 
 
 @app.get("/api/claims/{cid}/briefing.mp3")
 def briefing_audio(cid: str):
     """The same script read aloud by Cartesia in a stock, labeled AI voice."""
-    data = _require_approved(cid)
-    if not cartesia.available():
-        raise HTTPException(503, "Spoken briefings need CARTESIA_API_KEY")
-    try:
-        audio = cartesia.speak(playbook.briefing(data))
-    except Exception as e:
-        raise HTTPException(502, f"Could not make the audio: {e}")
+    script = playbook.briefing(_require_approved(cid))
+    audio = call_audio.saved("briefing", script)  # a saved reading of this exact script works without a key too
+    if audio is None:
+        if not cartesia.available():
+            raise HTTPException(503, "Spoken briefings need CARTESIA_API_KEY")
+        try:
+            audio = cartesia.speak(script)
+        except Exception as e:
+            raise HTTPException(502, f"Could not make the audio: {e}")
     db.log(cid, "briefing_audio", {})
     return Response(audio, media_type="audio/mpeg",
                     headers={"Content-Disposition": 'attachment; filename="totaled-case-briefing.mp3"'})
