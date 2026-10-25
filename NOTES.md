@@ -4,7 +4,7 @@ Where things stand, what changed, and how to run and record the demo. See `READM
 
 ## What the demo shows
 
-Upload the sample report, say what happened, audit the offer (gap $5,082.53, 6 of 10 checks fail), cross-check the policy and letter, approve the letter, hear a simulated call to the adjuster, see "If they say no" (with a second simulated call), compute the net payout (CRS loan), then check sellers, set a mandate and place a test-card hold. A local run takes about 2:44.
+Upload the sample report, say what happened, audit the offer (gap $5,082.53, 6 of 10 checks fail), cross-check the policy and letter, approve the letter, hear a simulated call to the adjuster, see "If they say no" (with a second simulated call), compute the net payout (CRS loan), then check sellers, set a mandate and place a test-card hold. A local run takes about 2:35.
 
 ## Changes in this pass
 
@@ -14,13 +14,13 @@ Upload the sample report, say what happened, audit the offer (gap $5,082.53, 6 o
 - Windows bug fixed: the spoken briefing used a date format (`%-d`) that only works on Mac and Linux.
 - The recording script's output path used `.pathname`, which breaks on Windows. It now uses `fileURLToPath`.
 - Saved Claude letters rebuilt for the current evidence (CarGurus and Cars.com).
-- **Two simulated calls** (`backend/app/calls.py`, `call_routes.py`, `frontend/src/components/CallPlayback.tsx`):
+- **Two simulated calls, four lines each** (`backend/app/calls.py`, `call_routes.py`, `frontend/src/components/CallPlayback.tsx`):
   - after the letter is approved, the owner calls the adjuster;
   - in "If they say no", the adjuster stands by the offer and the owner asks for an appraisal and files a complaint.
   - Code writes the scripts from the audit, so every dollar is in the case file. The adjuster is a made-up person in a stock AI voice. The owner line is a clone of the presenter's own voice. No real insurer is called, and the screen says so.
   - The law-office call was dropped. The lawyer section links to State Bar certified referral services only (B&P § 6155).
 - **Saved so the demo needs no live calls:** the call audio and the briefing audio (`backend/app/fixtures/call/`), and Claude's reading of the demo account (`stories` in `demo_cache.json`).
-- `demo/record-demo.mjs` plays 13 seconds of call 1 and 9 seconds of call 2.
+- `demo/record-demo.mjs` plays the first 8 seconds of call 1 and the first 5 of call 2. The recording is silent video (`.webm`), because Playwright does not capture sound. To get the call audio into an MP4, log when each call starts and stops, then mix the saved speech in with a full FFmpeg (Playwright's own FFmpeg only writes VP8).
 
 ## Run and test
 
@@ -54,7 +54,8 @@ It also saves `demo/out/totaled-demo.webm`. For OBS, run it headed and record th
 ## Open items and risks
 
 - The deadline text counts from today. The sample offer is dated Oct 14, so "reopen by Nov 18" turns into "past" after that date.
-- Production steps take 2 to 5 seconds each, so a production recording runs longer than 2:44.
+- Production steps take 2 to 5 seconds each, so a production recording runs longer than 2:35.
+- Older call audio files in `backend/app/fixtures/call/` that no script line uses any more can be deleted.
 - Ask bar answers are not saved. They need a Claude key.
 - Keep the owner voice ID and the voice recording out of git. Never write keys into the repo.
 - `backend/.env` should have no plain-text note lines (python-dotenv warns) and no trailing slash on `CORS_ORIGINS`.
