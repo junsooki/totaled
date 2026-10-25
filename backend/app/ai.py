@@ -153,38 +153,6 @@ def draft_letter(evidence: List[dict]) -> Letter:
     return response.parsed_output
 
 
-def answer_claim_question(question: str, claim_context: str, retrieved_context: str) -> str:
-    """Answer a spoken claim question using only the supplied claim facts and Moss references."""
-    client = anthropic.Anthropic()
-    response = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=450,
-        output_config={"effort": "low"},
-        messages=[{
-            "role": "user",
-            "content": f"""You are Totaled's concise voice guide. Answer in natural spoken language, usually 1-3 sentences.
-Use only the claim facts and guidance below. Do not invent facts, deadlines, legal conclusions, or dollar amounts.
-If the information is insufficient, say what is missing. Explain estimates as estimates and say this is not legal advice.
-Never take an action: the user must approve letters, selections, and holds themselves.
-
-Claim facts:
-{claim_context}
-
-Retrieved guidance from Moss:
-{retrieved_context or "No relevant guidance was found."}
-
-User question: {question}"""
-        }],
-        **FALLBACK,
-    )
-    if response.stop_reason == "refusal":
-        raise RuntimeError("The voice guide could not answer that question")
-    answer = "".join(block.text for block in response.content if block.type == "text").strip()
-    if not answer:
-        raise RuntimeError("The voice guide returned an empty answer")
-    return answer
-
-
 DOLLARS = re.compile(r"\$\s?([\d,]+(?:\.\d{1,2})?)")
 
 
@@ -286,4 +254,48 @@ def read_story(story: str) -> StoryRead:
     )
     if response.stop_reason == "refusal" or response.parsed_output is None:
         raise RuntimeError(f"Claude could not read the account (stop_reason={response.stop_reason})")
+    return response.parsed_output
+
+
+class DocField(BaseModel):
+    key: str
+    value: str  # as printed; amounts without "$" or commas, dates as YYYY-MM-DD
+    page: int  # 1-indexed
+    quote: str  # one line copied verbatim from that page
+
+
+class DocRead(BaseModel):
+    fields: List[DocField]
+
+
+DOC_FIELDS = {
+    "policy": "insurer, policy_number, collision_deductible (dollars), rental_daily_limit (dollars per day), "
+              "rental_max_total (dollars per loss), gap_coverage (yes or no), appraisal_clause (one-sentence summary "
+              "of the appraisal provision, quoting its first line)",
+    "letter": "insurer, letter_date (YYYY-MM-DD), claim_number, offer_total (dollars), deductible (dollars)",
+}
+
+DOC_PROMPT = """This is a California car owner's {what}. Extract only these fields, and only if printed: {fields}.
+Copy values exactly as printed (amounts as plain numbers, dates as YYYY-MM-DD). Never compute or guess.
+For each field give the 1-indexed page and one line copied word for word from that page that shows it.
+Leave out any field the document does not state."""
+
+
+def read_document(pdf: bytes, kind: str) -> DocRead:
+    client = anthropic.Anthropic()
+    what = "auto insurance policy" if kind == "policy" else "letter from their insurer about the claim"
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=4000,
+        output_config={"effort": "low"},
+        output_format=DocRead,
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                            "data": base64.b64encode(pdf).decode()}},
+            {"type": "text", "text": DOC_PROMPT.format(what=what, fields=DOC_FIELDS[kind])},
+        ]}],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not read the document (stop_reason={response.stop_reason})")
     return response.parsed_output

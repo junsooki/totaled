@@ -90,6 +90,7 @@ def main():
         for what, y2 in (("audit", v["year"]), ("replace", v["year"] + 2)):
             args_ = (v["make"], v["model"], v["year"], y2, z, LOCAL_RADIUS_MI)
             needed[comps.run_input_and_key(*args_)[1]] = (f"{label} {what} zip={z!r}", args_)
+            needed[comps.carscom_input_and_key(*args_)[1]] = (f"{label} {what} zip={z!r} (cars.com)", args_)
     missing = []
     for key, (what, _) in ({} if args.keep_existing else needed).items():
         hit = db.cache_get(key)

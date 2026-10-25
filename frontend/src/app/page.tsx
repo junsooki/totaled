@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import AgentWork from "@/components/AgentWork";
 import AskBar from "@/components/AskBar";
+import Documents from "@/components/Documents";
 import Audit from "@/components/Audit";
 import IfNo from "@/components/IfNo";
 import Letter from "@/components/Letter";
@@ -202,7 +203,10 @@ export default function Home() {
             >
               <div className="mb-8"><AgentWork id={id} agent="Appraiser" active={busy === "audit"} defaultOpen={false} /></div>
               {audit ? (
-                <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} voiceEnabled={!!status?.voice_assistant} />
+                <div className="space-y-12">
+                  <Audit id={id} claim={claim} audit={audit} checks={status?.checks ?? []} />
+                  <Documents id={id} />
+                </div>
               ) : auditError ? (
                 <div>
                   <Notice tone="bad" title="The audit did not finish">{auditError}</Notice>
