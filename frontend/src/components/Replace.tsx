@@ -189,7 +189,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
                         </ul>
                       )}
                       <p className="mt-1 text-sm text-muted">
-                        CRS {chk.source} · test profile {persona ? `${titleCase(persona.name)} (${persona.profile})` : personaId}. The sandbox has no real dealers.
+                        CRS · test profile {persona ? `${titleCase(persona.name)} (${persona.profile})` : personaId}. The sandbox has no real dealers.
                       </p>
                     </Notice>
                   </div>
