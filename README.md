@@ -1,4 +1,4 @@
-# Totaled
+# Toto
 
 A tool for the weeks after a car accident. Its deep part is auditing a total loss offer: it checks the insurer's valuation against California's rule (10 CCR § 2695.8) and live market data, drafts an evidence-backed counteroffer, works out what the owner actually walks away with, and helps buy the next car safely. Cal Hacks 13.0.
 

@@ -150,7 +150,7 @@ export default function Home() {
     <div className="flex flex-1 flex-col">
       <header className="border-b-4 border-brand">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-4 sm:px-6">
-          <span className="font-serif text-2xl font-semibold tracking-tight text-brand">Totaled</span>
+          <span className="font-serif text-2xl font-semibold tracking-tight text-brand">Toto</span>
           <p className="text-base text-muted">Challenge the offer. See what you can spend. Find your next car.</p>
         </div>
       </header>

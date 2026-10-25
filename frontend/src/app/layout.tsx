@@ -13,7 +13,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Totaled",
+  title: "Toto",
   description: "Check your car's total-loss offer, build a counteroffer, and see what you would take home.",
 };
 

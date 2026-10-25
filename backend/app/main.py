@@ -33,7 +33,7 @@ from .valuation import bridge, comparable_listings, counteroffer, fair_value  # 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REOPEN_DAYS = 35
 
-app = FastAPI(title="Totaled")
+app = FastAPI(title="Toto")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
@@ -549,7 +549,7 @@ def if_they_say_no(cid: str):
 def case_package(cid: str):
     md = playbook.case_package(_require_approved(cid), db.events(cid))
     return Response(md, media_type="text/markdown",
-                    headers={"Content-Disposition": f'attachment; filename="totaled-case-{cid}.md"'})
+                    headers={"Content-Disposition": f'attachment; filename="toto-case-{cid}.md"'})
 
 
 @app.get("/api/claims/{cid}/briefing")
@@ -573,7 +573,7 @@ def briefing_audio(cid: str):
             raise HTTPException(502, f"Could not make the audio: {e}")
     db.log(cid, "briefing_audio", {})
     return Response(audio, media_type="audio/mpeg",
-                    headers={"Content-Disposition": 'attachment; filename="totaled-case-briefing.mp3"'})
+                    headers={"Content-Disposition": 'attachment; filename="toto-case-briefing.mp3"'})
 
 
 # --- 4. Net payout -----------------------------------------------------------

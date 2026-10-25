@@ -1,4 +1,4 @@
-# Totaled demo (3 minutes)
+# Toto demo (3 minutes)
 
 Numbers below are what https://totaled-web.vercel.app shows for the sample report as of Oct 24, 2026, 10 PM PT.
 If someone rebuilds the demo cache, rerun `backend/scripts/warmup.py`. It prints the gap and failed-check count to confirm.
@@ -16,7 +16,7 @@ If someone rebuilds the demo cache, rerun `backend/scripts/warmup.py`. It prints
 ## The script
 
 **0:00 The problem (15 s).** "When your car is totaled, the insurer values it with software. Californians get
-35 days to push back, and most accept the first offer. Totaled checks the insurer's math against California's
+35 days to push back, and most accept the first offer. Toto checks the insurer's math against California's
 total-loss rule and live listings. AI reads and writes. Code computes every dollar. You approve every action."
 
 **0:15 Upload (30 s).** Click **Try the sample report**. The page opens on **About the accident**.

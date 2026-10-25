@@ -167,7 +167,7 @@ def case_package(data: dict, events: List[dict]) -> str:
     md = [
         f"# Case package: {v.year} {v.make} {v.model} {v.trim or ''}".rstrip(),
         "",
-        f"Prepared by Totaled on {date.today().isoformat()}. Not legal advice. Every fact below lists its source. "
+        f"Prepared by Toto on {date.today().isoformat()}. Not legal advice. Every fact below lists its source. "
         "This package does not rate the strength of the case.",
         "",
         "## Summary",
@@ -258,7 +258,7 @@ def briefing(data: dict) -> str:
     failed = _failed(audit)
     owner = claim.policyholder_name
     parts = [
-        "This is an AI-generated voice reading a case summary prepared by Totaled"
+        "This is an AI-generated voice reading a case summary prepared by Toto"
         + (f" for {owner}" if owner else "") + ". It is not legal advice and it does not rate the case.",
         f"The car is a {v.year} {v.make} {v.model}, declared a total loss in California. "
         f"The insurer offered {_say_usd(o.total)} on {_month_day(date.fromisoformat(o.offer_date))}.",

@@ -104,7 +104,7 @@ export default function AskBar({ id }: { id: string }) {
                 <div className="flex flex-wrap items-center gap-3">
                   <button type="button" onClick={readAloud} className="cursor-pointer text-sm font-semibold text-brand underline focus-visible:outline-4 focus-visible:outline-brand">Read aloud</button>
                   <p className="text-sm text-muted">
-                    From your case file{answer.guidance_searched ? " and Totaled's guidance (found by Moss)" : ""} only · {answer.by === "claude" ? "Claude" : answer.by} · not legal advice
+                    From your case file{answer.guidance_searched ? " and Toto's guidance (found by Moss)" : ""} only · {answer.by === "claude" ? "Claude" : answer.by} · not legal advice
                   </p>
                 </div>
               </div>

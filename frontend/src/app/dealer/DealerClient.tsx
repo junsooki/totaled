@@ -154,7 +154,7 @@ function Dealer() {
 export default function DealerClient() {
   return (
     <main className="mx-auto w-full max-w-lg px-4 py-8 font-sans text-ink">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">Totaled dealer bidding</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-tight">Toto dealer bidding</h1>
       <p className="mt-2 text-lg text-muted">Compete live for buyers who already know what they can spend.</p>
       <div className="mt-6">
         <LiveProvider><Dealer /></LiveProvider>

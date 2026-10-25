@@ -1,4 +1,4 @@
-// Records the Totaled demo (DEMO.md) as a video: every click is real, against the live app.
+// Records the Toto demo (DEMO.md) as a video: every click is real, against the live app.
 //
 //   cd demo && npm install && npm run record                      # production, headless
 //   URL=http://localhost:3000 HEADED=1 npm run record             # local app, watch it run
@@ -72,7 +72,7 @@ const btn = (name, exact = false) => page.getByRole("button", { name, exact });
 try {
   // 0:00 The problem
   await page.goto(BASE);
-  await caption("When your car is totaled, the insurer values it with software. Totaled checks their math.", 4000);
+  await caption("When your car is totaled, the insurer values it with software. Toto checks their math.", 4000);
   await caption("AI reads and writes. Code computes every dollar. You approve every action.", 3500);
 
   // 0:15 Upload and the spoken account

@@ -45,7 +45,7 @@ export default function Briefing({ id }: { id: string }) {
           ) : audio ? (
             <div className="flex flex-wrap items-center gap-3">
               <audio controls src={audio} className="max-w-full" />
-              <Button variant="secondary" onClick={() => run("dl", () => download(`/api/claims/${id}/briefing.mp3`, "totaled-case-briefing.mp3"))}>
+              <Button variant="secondary" onClick={() => run("dl", () => download(`/api/claims/${id}/briefing.mp3`, "toto-case-briefing.mp3"))}>
                 Download the audio
               </Button>
             </div>

@@ -6,7 +6,7 @@ import fitz
 
 PAGE = fitz.paper_rect("letter")
 MARGIN = 72  # 1 inch
-FOOTER = "Prepared with Totaled. Not legal advice."
+FOOTER = "Prepared with Toto. Not legal advice."
 CSS = "body { font-family: serif; font-size: 11pt; line-height: 1.35; } p { margin: 0 0 11pt 0; }"
 
 

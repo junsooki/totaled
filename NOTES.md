@@ -1,4 +1,4 @@
-# Totaled: working notes (Oct 24, 2026)
+# Toto: working notes (Oct 24, 2026)
 
 Where things stand, what changed, and how to run and record the demo. See `README.md` for the product and `DEMO.md` for the spoken script.
 

@@ -13,7 +13,7 @@ export default function IfNo({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pkgError, setPkgError] = useState<string | null>(null);
-  const getPackage = () => download(`/api/claims/${id}/case-package.md`, "totaled-case-package.md")
+  const getPackage = () => download(`/api/claims/${id}/case-package.md`, "toto-case-package.md")
     .catch((e) => setPkgError(e instanceof Error ? e.message : String(e)));
 
   useEffect(() => {
