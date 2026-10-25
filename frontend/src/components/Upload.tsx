@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { API, Json, put, setClaimToken } from "@/lib/api";
+import StoryIntake, { type StoryAnswer } from "./StoryIntake";
 import { Badge, Button, Notice, inputCls } from "./ui";
 
 const fileBtn =
@@ -55,6 +56,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
   const [dragging, setDragging] = useState(false);
   const [draft, setDraft] = useState<{ id: string; claim: Json; by: string } | null>(null);
   const [situation, setSituation] = useState<Record<string, boolean>>({});
+  const [heard, setHeard] = useState<Record<string, string>>({});  // question key -> the owner's words that answered it
   const answered = SITUATION.every(([k]) => k in situation);
 
   async function start(files?: FileList | null) {
@@ -355,11 +357,24 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
         <p className="mt-1 max-w-prose text-base text-muted">
           Four quick questions. They decide whether we suggest talking to a lawyer. We never rate your case.
         </p>
+        <div className="mt-4">
+          <StoryIntake
+            id={draft.id}
+            onAnswers={(answers: StoryAnswer[]) => {
+              setSituation((prev) => ({ ...prev, ...Object.fromEntries(answers.map((a) => [a.key, a.answer])) }));
+              setHeard(Object.fromEntries(answers.map((a) => [a.key, a.quote])));
+            }}
+            onUseNote={(note) => setDraft((d) => d && { ...d, claim: { ...d.claim, loss_note: note.slice(0, 600) } })}
+          />
+        </div>
         <div className="mt-4 divide-y divide-line">
           {SITUATION.map(([k, q]) => (
             <fieldset key={k} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <legend className="sr-only">{q}</legend>
-              <span aria-hidden="true" className="text-lg text-ink">{q}</span>
+              <span aria-hidden="true" className="text-lg text-ink">
+                {q}
+                {heard[k] && <span className="block text-sm text-muted">From your account: “{heard[k]}”</span>}
+              </span>
               <div className="flex gap-2">
                 {([["Yes", true], ["No", false]] as const).map(([label, val]) => (
                   <label key={label} className={`min-h-11 cursor-pointer border-2 px-4 py-2 text-lg font-semibold focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand ${situation[k] === val ? "border-brand bg-brand text-white" : "border-ink bg-surface text-ink hover:bg-brand-soft"}`}>

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, ask, comps, crs, db, demo_cache, live, moss_voice, playbook  # noqa: E402
+from . import ai, ask, comps, crs, db, demo_cache, live, moss_voice, playbook, story  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -221,6 +221,28 @@ def set_situation(cid: str, body: Situation):
     db.update(cid, situation=body.model_dump())
     db.log(cid, "situation", {"yes": sum(body.model_dump().values())})
     return {"ok": True}
+
+
+class Story(BaseModel):
+    text: str = Field(min_length=3, max_length=story.MAX_CHARS)
+
+
+@app.post("/api/claims/{cid}/story")
+def read_story(cid: str, body: Story):
+    """The owner's spoken or typed account: a timeline and answers, each tied to their exact words. Kept private."""
+    _claim(cid)
+    words = len(body.text.split())
+    _agent(cid, "Reader", "working", f"Reading your account of what happened ({words} words)")
+    try:
+        result = story.read(body.text)
+    except Exception as e:
+        _agent(cid, "Reader", "error", "Could not read your account")
+        raise HTTPException(502, f"Claude could not read your account: {e}")
+    _agent(cid, "Reader", "done", f"Found {len(result['timeline'])} events and {len(result['answers'])} answers in your words"
+                                  + (f"; dropped {result['dropped']} that did not match what you said" if result["dropped"] else ""))
+    db.mutate(cid, lambda d: dict(d, story={"text": body.text, **result, "at": db.now()}),
+              ("story", {"events": len(result["timeline"]), "answers": len(result["answers"]), "by": result["by"]}))
+    return result
 
 
 @app.get("/api/claims/{cid}/page/{page}.png")

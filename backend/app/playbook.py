@@ -18,7 +18,7 @@ CHECK_RULE = {n: sec for n, _, sec in CHECKS}
 
 EVENT_TEXT = {
     "created": "Report uploaded", "extracted": "Report read", "confirmed": "Fields confirmed by the owner",
-    "situation": "Accident questions answered", "audited": "Offer audited", "letter_drafted": "Counteroffer drafted",
+    "situation": "Accident questions answered", "story": "Owner told what happened", "audited": "Offer audited", "letter_drafted": "Counteroffer drafted",
     "letter_approved": "Counteroffer approved by the owner", "payout": "Net payout computed",
     "shortlist": "Replacement cars shortlisted", "seller_check": "Seller checked", "mandate": "Spending mandate granted",
     "deposit": "Refundable deposit placed (test mode)",
@@ -166,6 +166,12 @@ def case_package(data: dict, events: List[dict]) -> str:
     for e in events:
         if e["kind"] in EVENT_TEXT:
             md.append(f"- {_day(e['at']).isoformat()}: {EVENT_TEXT[e['kind']]}")
+    told = data.get("story") or {}
+    if told.get("text"):
+        md += ["", "## What happened, in the owner's words", "", told["text"]]
+        if told.get("timeline"):
+            md += ["", "Timeline read from the account (each line quotes the owner):", ""]
+            md += [f"- {e['when'] or 'Time not given'}: {e['event']} (\"{e['quote']}\")" for e in told["timeline"]]
     md += ["", "## Deadlines and next steps", ""]
     md += [f"- {s['date'] or 'Any time'}: {s['step']}. {s['detail']}" for s in plan["steps"]]
 

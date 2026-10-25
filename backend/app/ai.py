@@ -238,3 +238,52 @@ def answer_question(question: str, sources: List[dict]) -> Answer:
     if response.stop_reason == "refusal" or response.parsed_output is None:
         raise RuntimeError(f"Claude could not answer (stop_reason={response.stop_reason})")
     return response.parsed_output
+
+
+class StoryEvent(BaseModel):
+    when: Optional[str] = None  # as the person said it ("Oct 3", "two days later"); null if they gave no time
+    event: str
+    quote: str  # the person's exact words this event comes from
+
+
+class StoryAnswer(BaseModel):
+    key: str  # injured | fault_disputed | rideshare_or_commercial | other_at_fault_drivers
+    answer: bool
+    quote: str
+
+
+class StoryRead(BaseModel):
+    timeline: List[StoryEvent]
+    answers: List[StoryAnswer]
+    letter_note: Optional[str] = None  # a neutral sentence about the loss the owner may choose to send
+
+
+STORY_PROMPT = """A car owner in California told us, in their own words, what happened in the accident that totaled
+their car. Read their account. Use only what they said; never infer, guess or add.
+- timeline: the events in order. "when" is the time exactly as they said it, or null. Each "quote" is copied
+  word for word from their account.
+- answers: only for questions their account clearly answers, each with the exact words that answer it:
+  injured (was anyone injured), fault_disputed (does anyone dispute who was at fault),
+  rideshare_or_commercial (was a rideshare or commercial vehicle involved),
+  other_at_fault_drivers (could other drivers share the fault). Leave out any question they did not answer.
+- letter_note: at most two short sentences the owner could send to their insurer, stating only neutral facts
+  about the loss (date, place, what happened to the car). Never mention fault, injuries, admissions or anything
+  they did not say. Null if there is nothing neutral to state.
+
+Their account:
+{story}"""
+
+
+def read_story(story: str) -> StoryRead:
+    client = anthropic.Anthropic()
+    response = client.beta.messages.parse(
+        model=MODEL,
+        max_tokens=4000,
+        output_config={"effort": "low"},
+        output_format=StoryRead,
+        messages=[{"role": "user", "content": STORY_PROMPT.format(story=story)}],
+        **FALLBACK,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError(f"Claude could not read the account (stop_reason={response.stop_reason})")
+    return response.parsed_output
