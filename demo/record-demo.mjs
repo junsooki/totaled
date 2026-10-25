@@ -161,9 +161,13 @@ try {
   await page.getByText(/Blocked by your spending cap/).waitFor();
   await show(page.getByText(/Blocked by your spending cap/));
   await caption("The $16,786 car is over the $15,000 cap, so the checkout refuses it.", 4000);
+  await caption("Raise the cap to $20,000 and try again.", 1500);
   await page.locator("#car-cap").fill("20000");
-  await btn("Update mandate").click();
-  await page.getByText(/Granted MND-/).waitFor();
+  // Wait for the new mandate to be saved before holding the car again.
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/mandate") && r.request().method() === "POST"),
+    btn("Update mandate").click(),
+  ]);
   await btn("Hold this car").click();
   await page.getByLabel("Deposit ($)").fill("500");
   await page.getByRole("checkbox").check();
