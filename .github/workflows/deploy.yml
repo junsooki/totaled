@@ -1,0 +1,45 @@
+# Deploy main to both Vercel projects on every push, whoever the commit author is.
+#
+# Vercel's own Git deploys are blocked for authors who aren't members of the (Hobby) Vercel project. This job
+# deploys with the project owner's token from a copy of the code without git history, so it is never blocked.
+# Needs one repository secret: VERCEL_TOKEN (vercel.com/account/tokens, scoped to the team). Without it, the job skips.
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true  # a newer push supersedes a deploy still in progress
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1  # backend first, so new API routes exist before the site calls them
+      matrix:
+        include:
+          - project: totaled-api
+            project_id: prj_LiL3TBarvv4TjhkCEYM14cOoaons
+          - project: totaled-web
+            project_id: prj_wGLEGtkzTJUhNvrcVDWJ9QAscPj8
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Skip without a Vercel token
+        if: env.VERCEL_TOKEN == ''
+        run: echo "::warning::Set the VERCEL_TOKEN repository secret to deploy automatically."
+      - uses: actions/checkout@v4
+        if: env.VERCEL_TOKEN != ''
+      - name: Copy the code without git history
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/site/.vercel"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/site"
+          printf '{"projectId":"%s","orgId":"team_TrG6wZJyPywGBDqHK6nbKHb4"}' "${{ matrix.project_id }}" > "$RUNNER_TEMP/site/.vercel/project.json"
+      - name: Deploy ${{ matrix.project }} to production
+        if: env.VERCEL_TOKEN != ''
+        working-directory: ${{ runner.temp }}/site
+        run: npx --yes vercel@50.19.1 deploy --prod --yes --token "$VERCEL_TOKEN"
