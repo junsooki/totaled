@@ -44,10 +44,11 @@ offer, or **$6,587.28** at yours. Financing qualifies, up to $30,000 at about 6.
 
 **2:10 Next car (40 s).** Buying power is **$36,587.28**. "The same listings that prove the lowball are now the
 shopping list." Point at the reason under #1: "$3,904 under market." Check the seller on **#3, American Auto Depot**:
-**Deposit locked: lien not cleared.** Check **#1, Golden State Auto**: passed. **Grant this mandate** with a $1,000
-cap. **Hold this car**, enter a $1,500 deposit, and it's **blocked by your spending cap**. Change it to $500 and
-place it. The receipt says it **stayed inside the mandate**, and the seller gets a buyer whose budget and
-financing are already verified.
+**Deposit locked: lien not cleared.** Check **#1, Golden State Auto** ($16,786): passed. The spending cap limits the
+car's price. Set it to **$15,000** and **Grant this mandate**. **Hold this car** and place a $500 deposit: it's
+**blocked by your spending cap**, because the car costs more than the cap. Raise the cap to $20,000, **Update
+mandate**, and place it again. The receipt says it **stayed inside the mandate**, and the seller gets a buyer
+whose budget and financing are already verified.
 
 **2:50 Close (10 s).** "Verify before you trust. Every number, every seller, every source. Not legal advice. You
 approve every step."
