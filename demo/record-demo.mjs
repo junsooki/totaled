@@ -124,7 +124,7 @@ try {
   await show(page.getByText("What the call could sound like"), 1000);
   await caption("A simulated call to the adjuster. The owner's voice is a clone of the presenter's; the adjuster is an AI voice. Every number comes from the case file.", 5500);
   await btn("Hear the call").first().click();
-  await page.waitForTimeout(13000);
+  await page.waitForTimeout(8000);
   await btn("Stop the call").first().click();
   await page.getByText("If they say no").first().waitFor();
   await show(page.getByText("If they say no").first());
@@ -132,7 +132,7 @@ try {
   await show(page.getByText("If they say no, a follow-up call"), 1000);
   await caption("And a follow-up call: the adjuster stands by the offer, and the owner asks for an appraisal and files a complaint.", 5000);
   await btn("Hear the call").nth(1).click();
-  await page.waitForTimeout(9000);
+  await page.waitForTimeout(5000);
   await btn("Stop the call").first().click();
   await show(page.getByText("A lawyer is worth talking to, and here is why"));
   await caption("Fault is disputed and a rideshare was involved, so it explains why a lawyer is worth talking to. It never rates the case.", 5000);
