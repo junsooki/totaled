@@ -51,7 +51,7 @@ export default function Documents({ id }: { id: string }) {
   }
 
   const has = new Set((data?.documents ?? []).map((d: Json) => d.kind));
-  const uploader = (kind: string, label: string) => (
+  const uploader = (kind: string, label: string, sampleLabel: string) => (
     <div className="flex flex-wrap items-center gap-3">
       <label className="inline-flex min-h-11 cursor-pointer items-center border-2 border-ink bg-surface px-5 py-2 text-lg font-semibold text-ink hover:bg-brand-soft focus-within:outline-4 focus-within:outline-brand">
         {busy === kind ? "Reading…" : `Upload ${label} (PDF)`}
@@ -60,7 +60,7 @@ export default function Documents({ id }: { id: string }) {
       </label>
       <button type="button" disabled={!!busy} onClick={() => add(kind)}
         className="cursor-pointer text-base font-semibold text-brand underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-        Try the sample {label}
+        Try the sample {sampleLabel}
       </button>
     </div>
   );
@@ -72,8 +72,8 @@ export default function Documents({ id }: { id: string }) {
         We read each one, show the exact line behind every fact, and compare it with the valuation report. Optional.
       </p>
       <div className="mt-4 space-y-3">
-        {!has.has("policy") && uploader("policy", "your policy")}
-        {!has.has("letter") && uploader("letter", "the insurer's letter")}
+        {!has.has("policy") && uploader("policy", "your policy", "policy")}
+        {!has.has("letter") && uploader("letter", "the insurer's letter", "letter")}
       </div>
       {error && <div className="mt-3"><Notice tone="bad"><p>{error}</p></Notice></div>}
 
