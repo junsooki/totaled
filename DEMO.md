@@ -1,6 +1,6 @@
 # Toto demo (3 minutes)
 
-Numbers below are what https://totaled-web.vercel.app shows for the sample report as of Oct 24, 2026, 10 PM PT.
+Numbers below are what https://toto-claims.vercel.app shows for the sample report as of Oct 24, 2026, 10 PM PT.
 If someone rebuilds the demo cache, rerun `backend/scripts/warmup.py`. It prints the gap and failed-check count to confirm.
 
 ## Before judges arrive
