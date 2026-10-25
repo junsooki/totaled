@@ -12,8 +12,8 @@ const fileSecondary = `${fileBtn} border-2 border-ink bg-surface text-ink hover:
 const linkCls =
   "cursor-pointer text-brand underline underline-offset-4 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline";
 const EXAMPLE_NOTE = "Another car ran a red light and hit my driver side. I was not hurt. Repairs were quoted at $9,800.";
-// Used when the browser cannot tell us where the user is: the Palace of Fine Arts, San Francisco.
-const DEFAULT_ZIP = "94123";
+// Used when the browser cannot tell us where the user is: Berkeley, the ZIP the saved demo data covers.
+const DEFAULT_ZIP = "94704";
 const sectionH ="font-serif text-2xl font-semibold text-ink";
 
 type Path = (string | number)[];
@@ -393,7 +393,7 @@ export default function Upload({ onConfirmed, onWide }: { onConfirmed: (id: stri
             <p id="zip-note" className="mt-1 text-base text-muted" aria-live="polite">
               {zipNote === "wait" ? "Finding your ZIP…"
                 : zipNote === "found" ? "Filled from your location. Change it if it is wrong."
-                : zipNote === "default" ? `We could not get your location, so we used ${DEFAULT_ZIP} (the Palace of Fine Arts in San Francisco). Change it to your ZIP.`
+                : zipNote === "default" ? `We could not get your location, so we used ${DEFAULT_ZIP} (Berkeley, CA). Change it to your ZIP.`
                 : !zipOk ? "Enter a 5-digit ZIP." : ""}
             </p>
           </div>
