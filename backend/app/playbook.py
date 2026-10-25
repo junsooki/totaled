@@ -242,6 +242,10 @@ SPOKEN_REASON = {
 }
 
 
+def _month_day(d: date) -> str:
+    return f"{d:%B} {d.day}"  # %-d is not supported by strftime on Windows
+
+
 def _say_usd(x: float) -> str:
     return f"{x:,.0f} dollars"
 
@@ -257,7 +261,7 @@ def briefing(data: dict) -> str:
         "This is an AI-generated voice reading a case summary prepared by Totaled"
         + (f" for {owner}" if owner else "") + ". It is not legal advice and it does not rate the case.",
         f"The car is a {v.year} {v.make} {v.model}, declared a total loss in California. "
-        f"The insurer offered {_say_usd(o.total)} on {date.fromisoformat(o.offer_date):%B %-d}.",
+        f"The insurer offered {_say_usd(o.total)} on {_month_day(date.fromisoformat(o.offer_date))}.",
     ]
     if failed:
         parts.append(f"The valuation fails {len(failed)} of the {len(CHECKS)} checks under California's total loss rule, "
@@ -267,7 +271,7 @@ def briefing(data: dict) -> str:
                      f"The owner asked for {_say_usd(co['total'])}, which is {_say_usd(co['gap'])} more than the offer.")
     dated = [s for s in plan["steps"] if s["date"]]
     if dated:
-        parts.append("Dates: " + "; ".join(f"{s['step'].lower()} by {date.fromisoformat(s['date']):%B %-d}" for s in dated) + ".")
+        parts.append("Dates: " + "; ".join(f"{s['step'].lower()} by {_month_day(date.fromisoformat(s['date']))}" for s in dated) + ".")
     situation = data.get("situation") or {}
     reasons = [SPOKEN_REASON[k] for k in SPOKEN_REASON if situation.get(k)]
     if co and co["gap"] > SMALL_CLAIMS_LIMIT:
