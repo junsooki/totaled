@@ -2,6 +2,7 @@ import base64
 import asyncio
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -13,14 +14,14 @@ from typing import List, Optional
 
 import fitz
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, ask, cartesia, comps, crs, db, demo_cache, live, moss_voice, playbook, story  # noqa: E402
+from . import ai, ask, cartesia, comps, crs, db, demo_cache, documents, live, moss_voice, playbook, story  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -79,7 +80,6 @@ def status():
         "crs": "demo" if crs.demo_mode() else ("live" if crs.available() else "missing"),
         "moss": "ready" if moss_voice.available() else "missing",
         "cartesia": "live" if cartesia.available() else "missing",
-        "voice_assistant": bool(moss_voice.available() and ai.available()),
         "database": "postgres" if db.DATABASE_URL else "sqlite",
         "checks": [{"check": n, "name": name, "rule": sec} for n, name, sec in CHECKS],
         "personas": [{k: p[k] for k in ("id", "name", "profile", "decision")} for p in crs.PERSONAS],
@@ -246,6 +246,66 @@ def read_story(cid: str, body: Story):
     return result
 
 
+MAX_DOCUMENTS = 6
+
+
+def _public_doc(d: dict) -> dict:
+    return {k: v for k, v in d.items() if k != "pdf"}
+
+
+@app.post("/api/claims/{cid}/documents")
+async def add_document(cid: str, kind: str = Form(...), file: Optional[UploadFile] = File(None)):
+    """The owner's policy or an insurer's letter (PDF); send no file to use the matching sample."""
+    data = _claim(cid)
+    if kind not in documents.KINDS:
+        raise HTTPException(422, "kind must be policy or letter")
+    if len(data.get("documents") or []) >= MAX_DOCUMENTS:
+        raise HTTPException(413, f"Upload at most {MAX_DOCUMENTS} documents")
+    if file:
+        if file.content_type != "application/pdf":
+            raise HTTPException(415, "Upload the document as a PDF")
+        pdf, name, is_sample = await file.read(20 * 1024 * 1024 + 1), file.filename or kind, False
+        if len(pdf) > 20 * 1024 * 1024:
+            raise HTTPException(413, "The document must be smaller than 20 MB")
+    else:
+        pdf, name, is_sample = documents.sample(kind), f"Sample {'policy' if kind == 'policy' else 'insurer letter'}", True
+    _agent(cid, "Reader", "working", f"Reading your {'policy' if kind == 'policy' else 'insurer letter'}")
+    try:
+        result = await asyncio.to_thread(documents.read, pdf, kind, is_sample)
+    except Exception as e:
+        _agent(cid, "Reader", "error", "Could not read the document")
+        raise HTTPException(502, f"Could not read the document: {e}")
+    doc = {"id": uuid.uuid4().hex[:8], "kind": kind, "name": name, "sample": is_sample,
+           "pdf": base64.b64encode(pdf).decode(), "at": db.now(), **result}
+    _agent(cid, "Reader", "done", f"Found {len(result['fields'])} fields in {name}, each matched to a line on its page"
+                                  + (f"; dropped {result['dropped']} that did not match" if result["dropped"] else ""))
+    db.mutate(cid, lambda d: dict(d, documents=(d.get("documents") or []) + [doc]),
+              ("document", {"kind": kind, "fields": len(result["fields"]), "by": result["by"]}))
+    return _public_doc(doc)
+
+
+@app.get("/api/claims/{cid}/documents")
+def list_documents(cid: str):
+    data = _claim(cid)
+    docs = data.get("documents") or []
+    return {"documents": [_public_doc(d) for d in docs], "checks": documents.crosscheck(Claim(**data["claim"]), docs)}
+
+
+@app.get("/api/claims/{cid}/documents/{doc_id}/page/{page}.png")
+def document_page(cid: str, doc_id: str, page: int, quote: Optional[str] = None):
+    doc = next((d for d in _claim(cid).get("documents") or [] if d["id"] == doc_id), None)
+    if not doc:
+        raise HTTPException(404, "No such document")
+    pdf = fitz.open(stream=base64.b64decode(doc["pdf"]), filetype="pdf")
+    if not 1 <= page <= pdf.page_count:
+        raise HTTPException(404, "No such page")
+    p = pdf[page - 1]
+    if quote:
+        for rect in p.search_for(quote):
+            p.add_highlight_annot(rect)
+    return Response(p.get_pixmap(dpi=110).tobytes("png"), media_type="image/png")
+
+
 @app.get("/api/claims/{cid}/page/{page}.png")
 def page_image(cid: str, page: int, quote: Optional[str] = None):
     """Render a report page, highlighting the quoted line (click to source)."""
@@ -283,7 +343,9 @@ def audit(cid: str):
         _agent(cid, "Appraiser", "error", f"Market search failed: {e}")
         raise HTTPException(502, f"Could not fetch market listings: {e}")
 
-    _agent(cid, "Appraiser", "working", f"Found {len(market['listings'])} listings ({market['source']})")
+    _agent(cid, "Appraiser", "working", f"Found {len(market['listings'])} listings: "
+           + ", ".join(f"{x['name']} {x['count']} ({x['source']})" for x in market["sources"])
+           + "".join(f"; {u.split(':')[0]} unavailable" for u in market["unavailable"]))
     matches = comparable_listings(market["listings"], v)
     _agent(cid, "Appraiser", "working", f"Kept {len(matches)} with the same year and trim")
     fv = fair_value(matches, v.mileage)
@@ -297,7 +359,8 @@ def audit(cid: str):
         "checks": checks,
         "failed": failed,
         "recomputed_base": recomputed_base,
-        "market": {"source": market["source"], "fetched_at": market["fetched_at"], "listings": matches, "fair_value": fv, "searched": len(market["listings"])},
+        "market": {"source": market["source"], "fetched_at": market["fetched_at"], "listings": matches, "fair_value": fv,
+                   "searched": len(market["listings"]), "sources": market["sources"], "unavailable": market["unavailable"]},
         "counteroffer": co,
         "bridge": bridge(claim, recomputed_base, fv["estimate"], co) if co else [],
         "insurer_comps": [{"id": c.id, "odometer": c.odometer, "adjusted_value": c.adjusted_value, "trim": c.trim,
@@ -313,55 +376,6 @@ def audit(cid: str):
     db.log(cid, "audited", {"failed": result["failed"], "market_source": market["source"],
                             "gap": co["gap"] if co else None})
     return result
-
-
-class VoiceQuestion(BaseModel):
-    question: str = Field(min_length=3, max_length=500)
-
-
-@app.post("/api/claims/{cid}/voice-answer")
-async def voice_answer(cid: str, body: VoiceQuestion):
-    """Answer a transcribed voice question with Moss retrieval and the private claim's deterministic facts."""
-    data = _claim(cid)
-    if not moss_voice.available():
-        raise HTTPException(503, "Set MOSS_PROJECT_ID, MOSS_PROJECT_KEY, and build the Totaled Moss index")
-    if not ai.available():
-        raise HTTPException(503, "Set ANTHROPIC_API_KEY to enable spoken answers")
-
-    claim = Claim(**data["claim"])
-    audit_data = data.get("audit") or {}
-    payout = data.get("payout") or {}
-    outcome = payout.get("at_counteroffer") or payout.get("at_offer") or {}
-    failed = [row for row in audit_data.get("checks", []) if row.get("status") == "fail"]
-    facts = [
-        f"Vehicle: {claim.vehicle.year} {claim.vehicle.make} {claim.vehicle.model} {claim.vehicle.trim or ''}".strip(),
-        f"Insurer offer: ${claim.offer.total:,.2f} dated {claim.offer.offer_date}.",
-        f"Audit failed {len({row.get('check') for row in failed})} distinct checks. "
-        + "; ".join(f"Check {row.get('check')}: {row.get('detail')}" for row in failed[:8]),
-    ]
-    if audit_data.get("market", {}).get("fair_value"):
-        facts.append(f"Estimated market value: ${audit_data['market']['fair_value']['estimate']:,.2f}.")
-    if audit_data.get("counteroffer"):
-        co = audit_data["counteroffer"]
-        facts.append(f"Estimated counteroffer total: ${co['total']:,.2f}; estimated difference from offer: ${co['gap']:,.2f}.")
-    if audit_data.get("deadline"):
-        facts.append(f"Reminder date shown by the app: {audit_data['deadline']['date']}.")
-    if outcome:
-        facts.append(f"Estimated walk-away amount: ${outcome['walk_away']:,.2f}; loan balance used: ${outcome['loan_balance']:,.2f}.")
-    claim_context = "\n".join(facts)
-
-    live.agent(cid, "Voice guide", "working", "Searching Totaled guidance and preparing a spoken answer")
-    try:
-        retrieval = await moss_voice.search(body.question)
-        retrieved_context = "\n".join(
-            f"[{doc['id']}] {doc['text']}" for doc in retrieval["docs"]
-        )
-        answer = await asyncio.to_thread(ai.answer_claim_question, body.question, claim_context, retrieved_context)
-    except Exception as e:
-        live.agent(cid, "Voice guide", "error", "Could not retrieve guidance or prepare an answer")
-        raise HTTPException(502, f"Voice assistant unavailable: {e}")
-    live.agent(cid, "Voice guide", "done", f"Answered using {len(retrieval['docs'])} Moss references")
-    return {"answer": answer, "references": retrieval["docs"], "retrieval_ms": retrieval["time_ms"]}
 
 
 # --- 3. Counteroffer ---------------------------------------------------------
@@ -432,18 +446,26 @@ class Question(BaseModel):
 
 
 @app.post("/api/claims/{cid}/ask")
-def ask_case(cid: str, body: Question):
-    """Ask about your case. Answers come only from the case file and the rule text, each sentence cited."""
+async def ask_case(cid: str, body: Question):
+    """Ask about your case, typed or spoken. Answers come only from the case file, the rule text and Moss's
+    matching public guidance, each sentence cited. Claim facts are never sent to Moss."""
     data = _claim(cid)
     if "audit" not in data:
         raise HTTPException(400, "Run the audit first")
     q = body.question.strip()
     if not 3 <= len(q) <= 500:
         raise HTTPException(422, "Ask a question between 3 and 500 characters")
+    guidance = []
+    if moss_voice.available():
+        try:
+            guidance = (await moss_voice.search(q))["docs"][:3]
+        except Exception as e:  # guidance is a bonus; the case file still answers
+            logging.warning("Moss search failed: %s", e)
     try:
-        result = ask.answer(q, data)
+        result = await asyncio.to_thread(ask.answer, q, data, guidance)
     except Exception as e:
         raise HTTPException(502, f"Could not answer: {e}")
+    result["guidance_searched"] = len(guidance)
     db.log(cid, "asked", {"found": result["found"], "by": result["by"]})
     return result
 
@@ -575,7 +597,8 @@ def replace(cid: str):
     for i, l in enumerate(ranked, 1):
         l["why"] = _why(i, l)
     result = {"budget": round(budget, 2), "walk_away": np_["walk_away"], "financing": np_["prequal"],
-              "source": market["source"], "fetched_at": market["fetched_at"], "shortlist": ranked}
+              "source": market["source"], "fetched_at": market["fetched_at"], "sources": market["sources"],
+              "shortlist": ranked}
     db.update(cid, replace=result)
     _agent(cid, "Shopper", "done", f"{len(ranked)} cars under the ${result['budget']:,.0f} budget, ranked by value")
     db.log(cid, "shortlist", {"budget": result["budget"], "count": len(ranked)})

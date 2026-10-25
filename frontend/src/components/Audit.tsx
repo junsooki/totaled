@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { fileUrl, Json, usd } from "@/lib/api";
 import { Badge, Notice, Stat, SummaryList } from "./ui";
 import { Bridge, Market } from "./ValueCharts";
-import VoiceAssistant from "./VoiceAssistant";
 
 const focusRing = "focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
@@ -109,10 +108,11 @@ function ReportLine({ path, alt }: { path: string; alt: string }) {
   );
 }
 
+const shortTime = (iso: string) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const label = (s: string) => (s === "fail" ? "Failed" : s === "pass" ? "Passed" : "Needs a look");
 const toneCls = (s: string) => (s === "fail" ? "text-alert" : s === "pass" ? "text-brand" : "text-amber");
 
-export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: string; claim: Json; audit: Json; checks: Json[]; voiceEnabled: boolean }) {
+export default function Audit({ id, claim, audit, checks }: { id: string; claim: Json; audit: Json; checks: Json[] }) {
   const [open, setOpen] = useState<Set<number>>(new Set());
   const [shown, setShown] = useState<string | null>(null);
   const fv = audit.market.fair_value;
@@ -245,7 +245,9 @@ export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: 
       />
       <p className="max-w-prose text-base text-muted">
         {fv ? "The estimate uses same-year, same-trim listings. " : "No matching listings found. "}
-        {audit.market.fetched_at && `CarGurus via Apify, fetched ${new Date(audit.market.fetched_at).toLocaleString()}.`}
+        {(audit.market.sources ?? []).map((x: Json) => `${x.name} ${x.count}${x.fetched_at ? `, fetched ${shortTime(x.fetched_at)}` : ""}`).join(" · ")}
+        {audit.market.sources?.length ? " (via Apify). " : ""}
+        {(audit.market.unavailable ?? []).length > 0 && `Unavailable this time: ${audit.market.unavailable.map((u: string) => u.split(":")[0]).join(", ")}.`}
       </p>
       <Market listings={audit.market.listings} fair={fv} mileage={claim.vehicle.mileage} insurer={audit.insurer_comps ?? []} />
       {audit.market.listings.length > 0 && (
@@ -260,7 +262,7 @@ export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: 
                   {" "}· {usd(l.price)} · {l.mileage?.toLocaleString()} mi{l.distance_mi != null ? ` · ${l.distance_mi} mi away` : ""}
                 </span>
                 <span className="flex items-center gap-2 text-sm">
-                  {l.source === "demo" ? "Saved demo listing" : `CarGurus via Apify${audit.market.fetched_at ? `, fetched ${new Date(audit.market.fetched_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}`}
+                  {l.source === "demo" ? "Saved demo listing" : `${l.source === "cars.com" ? "Cars.com" : "CarGurus"} via Apify`}
                   <Badge tone={audit.market.source === "live" ? "green" : "amber"}>{audit.market.source === "live" ? "live" : audit.market.source === "cached" ? "saved" : "demo"}</Badge>
                 </span>
               </li>
@@ -312,7 +314,6 @@ export default function Audit({ id, claim, audit, checks, voiceEnabled }: { id: 
       </Notice>
 
       <Tabs panels={{ failed: failedPanel, market: marketPanel, gap: gapPanel }} />
-      {voiceEnabled && <VoiceAssistant claimId={id} />}
     </div>
   );
 }

@@ -15,12 +15,12 @@ Californians whose insurer has declared their car a total loss and offered less 
 | # | Screen | What happens | Code |
 |---|---|---|---|
 | 1 | Upload | Claude reads the report PDF into structured fields, including the insurer, claim and policy numbers and the policyholder name for the letter; the user confirms each one, can add an optional note about what happened, and answers four yes/no questions (injury, disputed fault, rideshare or commercial vehicle, other at-fault drivers) | `backend/app/ai.py`, `frontend/src/components/Upload.tsx` |
-| 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings (Estimate) with each listing's source and fetch time, gap in dollars, 35-day deadline, voice claim guide | `backend/app/checks.py`, `valuation.py`, `comps.py`, `VoiceAssistant.tsx` |
+| 2 | Audit | The 10 checks, click any result to see the highlighted report line, fair value from live listings on CarGurus and Cars.com (Estimate) with each listing's source and fetch time, gap in dollars, 35-day deadline. Optional: upload the policy and the insurer's letters; code cross-checks the deductible, appraisal clause, rental and GAP coverage, and the letter's amount, claim number and date against the report, each fact linked to its highlighted line | `backend/app/checks.py`, `valuation.py`, `comps.py`, `documents.py`, `Documents.tsx` |
 | 3 | Counteroffer | Claude drafts the letter; every sentence cites evidence; code rejects any dollar amount not in the evidence; user edits then approves; the approved letter can be copied or downloaded as a PDF. Then "If they say no": dated next steps, a Department of Insurance complaint draft, the appraisal clause and small claims. When a rule fires (any yes answer, or a gap over the small claims limit) it says why a lawyer is worth talking to and offers an attorney-ready case package | `backend/app/letter.py`, `playbook.py`, `escalate.py`, `IfNo.tsx` |
 | 4 | Net payout | CRS credit report finds the auto loan. Side by side at the offer and at the counteroffer: what you owe, what you walk away with, negative equity and GAP, buying power, whether financing qualifies, in plain words | `backend/app/crs.py`, `Payout.tsx` |
 | 5 | Next car | Cars ranked inside your budget, each with the reason for its rank and an above-market flag from the same valuation code. A CRS seller check (identity and liens) locks the deposit until it comes back clean. A mandate sets the budget, the spending cap, the sellers that passed, an expiry and what the agent cannot do. A test-card deposit, then a receipt that shows it stayed inside the mandate | `backend/app/main.py`, `Replace.tsx` |
 
-Every step logs what its agent did (Reader, Appraiser, Negotiator, Banker, Shopper), shown on each screen. An ask bar answers questions from the case file and the rule text only, citing a source for every sentence (`backend/app/ask.py`).
+Every step logs what its agent did (Reader, Appraiser, Negotiator, Banker, Shopper), shown on each screen. An ask bar (typed or spoken) answers questions from the case file, the rule text and Moss's matching guidance only, citing a source for every sentence (`backend/app/ask.py`). "Find a lawyer" links to the State Bar's certified referral services and license search; the app never lists or recommends lawyers.
 
 The results card shows dollars at stake, checks failed (distinct checks, not rows) and minutes from upload to approved letter, with an audit trail.
 
@@ -30,10 +30,11 @@ Claim API requests require a per-claim secret returned at upload; the backend st
 
 Each integration runs live when its key is set. With `DEMO_MODE=1`, Apify and CRS return clearly labeled demo data so the whole flow can run without keys. Without `ANTHROPIC_API_KEY`, the sample report uses its known fields and the letter is a code template. The UI shows which mode each integration is in.
 
-- Apify: `e-commerce/cargurus-zipcode-search-scraper`; each search is saved in the database and reused for `MARKET_CACHE_HOURS` (24 on prod), capped at $0.50 per run.
+- Apify: two listing sources, `e-commerce/cargurus-zipcode-search-scraper` (capped at $0.50 per run) and `fatihtahta/cars-com-scraper` (20 listings, about $0.02; its minimum cap is $1). Each search is saved in the database and reused for `MARKET_CACHE_HOURS` (24 on prod). If one source fails, the other still values the car and the screen says which was unavailable.
 - CRS: sandbox REST API, test personas only (`backend/app/fixtures/crs_personas.json`), never real credit data.
 - Claude: `claude-opus-5-5` with structured output and server-side refusal fallback.
-- MOSS: optional semantic retrieval for the voice claim guide. It indexes only the public guidance in `backend/app/fixtures/voice_knowledge.json`; per-claim facts go to Claude for the answer and are never sent to MOSS. Browser speech recognition and playback provide voice input/output, with a typed question fallback.
+- MOSS: semantic retrieval behind the ask bar. It indexes only the public guidance in `backend/app/fixtures/voice_knowledge.json` (rebuild with `scripts/build_moss_index.py` after editing it); the question is sent to Moss, claim facts never are. Matching guidance becomes citable `guide:` sources. On serverless hosts the model is cached under `/tmp` (`MOSS_MODEL_CACHE_DIR`).
+- Cartesia: `CARTESIA_API_KEY` turns on the spoken attorney briefing (stock voice, labeled as AI).
 - Visa: test-mode checkout. Only Visa test card numbers (such as 4242 4242 4242 4242) are accepted, checked in code; no real card is charged and no payment provider is called yet.
 
 ## Demo cache
@@ -55,7 +56,8 @@ Rebuild the Claude read and letters with `cd backend && python scripts/build_dem
 | Credit report, seller identity and liens (CRS) | CRS sandbox with test personas, never real people |
 | Prequalification tiers | Our illustration, not a lender's offer |
 | Deposit | Test mode with Visa test card numbers; no money moves |
-| Deadlines and the small claims limit | Rule citations in code (10 CCR § 2695.5(b), § 2695.8(c), Code Civ. Proc. § 116.221); to be confirmed by a lawyer |
+| Deadlines and the small claims limit | Checked against the rule text on Oct 24, 2026: 15-day reply (10 CCR § 2695.5(b)), 40-day accept or deny (§ 2695.7(b)), 35-day reopen (§ 2695.8(c)), $12,500 small claims limit (Code Civ. Proc. § 116.221). Not yet reviewed by a lawyer |
+| Policy and insurer letters | Real when uploaded; the bundled samples (`scripts/make_sample_documents.py`) are fictional and labeled |
 
 ## Where Claude can go wrong
 
@@ -68,7 +70,7 @@ Rebuild the Claude read and letters with `cd backend && python scripts/build_dem
 
 - Database: Postgres through `DATABASE_URL` (already supported), with row-level security on.
 - Payments: replace the test-card check with a payment provider's authorization hold, keeping the mandate checks on the server.
-- Legal: a California attorney reviews the letter template, the deadlines and the complaint draft; check the lawyer referral rules (Bus. & Prof. Code § 6155) before listing any attorneys.
+- Legal: a California attorney reviews the letter template, the deadlines and the complaint draft. Listing lawyers by name would risk operating an uncertified referral service (Bus. & Prof. Code § 6155; *Jackson v. LegalMatch.com* (2019) 42 Cal.App.5th 760) and scraping Google Maps breaks Google's terms, so the app links to the State Bar's certified referral services instead. A named list would need the Places API and an ethics review.
 - Personal data: real credit pulls need consent flows under the FCRA, and public tables keep holding no personal data.
 
 ## Real-time extras (SpacetimeDB, not in the main flow)

@@ -33,8 +33,9 @@ def _words(text: str) -> set:
     return {w.rstrip("s") for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in STOP and len(w) > 1}
 
 
-def answer(question: str, data: dict) -> dict:
-    src = sources(data)
+def answer(question: str, data: dict, guidance: List[dict] = ()) -> dict:
+    """`guidance` is Moss's matching public guidance; each item becomes a citable source next to the case facts."""
+    src = sources(data) + [{"id": f"guide:{g['id']}", "fact": g["text"], "amounts": []} for g in guidance]
     facts = {s["id"]: s["fact"] for s in src}
     if ai.available():
         a = ai.answer_question(question, src)

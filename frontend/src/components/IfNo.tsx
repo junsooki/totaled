@@ -69,7 +69,6 @@ export default function IfNo({ id }: { id: string }) {
           </ul>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <Button variant="secondary" onClick={getPackage}>Download the attorney-ready case package</Button>
-            <a className={linkCls} href={plan.state_bar_url} target="_blank" rel="noreferrer">Check a lawyer&apos;s license on the State Bar site</a>
           </div>
           <p className="mt-3 text-sm text-muted">
             The package lists what is documented, with sources, and what is missing. It does not rate your case. Not a referral service.
@@ -83,6 +82,20 @@ export default function IfNo({ id }: { id: string }) {
           <button type="button" onClick={getPackage} className={`cursor-pointer ${linkCls}`}>download the case package</button>.
         </p>
       )}
+      <details className="border-2 border-ink p-4">
+        <summary className="cursor-pointer text-base font-semibold text-ink">Find a lawyer</summary>
+        <p className="mt-2 max-w-prose text-base text-ink">
+          California&apos;s State Bar certifies lawyer referral services. Many offer a free or low-cost first consultation. Bring
+          your case package.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <a className={linkCls} href={plan.referral_services_url} target="_blank" rel="noreferrer">State Bar certified referral services</a>
+          <a className={linkCls} href={plan.state_bar_url} target="_blank" rel="noreferrer">Check a lawyer&apos;s license</a>
+        </div>
+        <p className="mt-3 text-sm text-muted">
+          We don&apos;t list, rank or recommend lawyers, and we receive nothing from any lawyer. Not a referral service. Not legal advice.
+        </p>
+      </details>
       {pkgError && <Notice tone="bad"><p>{pkgError}</p></Notice>}
       <p className="text-sm text-muted">Not legal advice.</p>
     </section>

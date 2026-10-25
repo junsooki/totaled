@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import List
 
 from .checks import CHECKS
+from . import documents
 from .escalate import SMALL_CLAIMS_LIMIT, escalate
 from .schemas import Claim
 
@@ -13,6 +14,8 @@ RULE = "10 CCR § 2695.8"
 REPLY_DAYS = 15  # 10 CCR § 2695.5(b): respond to claim communications within 15 calendar days
 CDI_COMPLAINT_URL = "https://www.insurance.ca.gov/01-consumers/101-help/"
 STATE_BAR_SEARCH_URL = "https://apps.calbar.ca.gov/attorney/LicenseeSearch/QuickSearch"
+# Certified lawyer referral services (B&P § 6155). We link to these instead of listing lawyers ourselves.
+REFERRAL_SERVICES_URL = "https://www.calbar.ca.gov/Public/Need-Legal-Help/Lawyer-Referral-Service"
 CHECK_NAME = {n: name for n, name, _ in CHECKS}
 CHECK_RULE = {n: sec for n, _, sec in CHECKS}
 
@@ -37,14 +40,18 @@ def _failed(audit: dict) -> List[int]:
     return sorted({r["check"] for r in audit["checks"] if r["status"] == "fail"})
 
 
-def _missing(claim: Claim, audit: dict) -> List[str]:
+def _missing(claim: Claim, audit: dict, data: dict) -> List[str]:
     out = [f"Check {r['check']} ({CHECK_NAME[r['check']]}): {r['detail']}"
            for r in audit["checks"] if r["status"] == "unknown"]
     if claim.offer.registration_prorated is None:
         out.append("The offer does not list prorated registration.")
     if claim.condition.deduction and not claim.condition.documented:
         out.append(f"No inspection notes or photos support the {_usd(claim.condition.deduction)} condition deduction.")
-    out.append("Not uploaded: your policy (for the appraisal clause) and the insurer's letters.")
+    kinds = {d["kind"] for d in data.get("documents") or []}
+    if "policy" not in kinds:
+        out.append("Not uploaded: your policy (for the deductible, the appraisal clause and rental coverage).")
+    if "letter" not in kinds:
+        out.append("Not uploaded: the insurer's letters.")
     return out
 
 
@@ -102,6 +109,17 @@ def if_no(data: dict) -> dict:
     sent = _day(letter["approved_at"])
     reopen = date.fromisoformat(audit["deadline"]["date"])
     small_ok = gap <= SMALL_CLAIMS_LIMIT
+    checks = {c["name"]: c for c in documents.crosscheck(claim, data.get("documents") or [])}
+    appr = checks.get("Appraisal clause")
+    if appr and appr["status"] == "found":
+        f = appr["sources"][0]
+        appraisal = (f"Your policy has an appraisal clause (page {f['page']}): \"{f['quote']}\" You and the insurer each "
+                     "pick an appraiser, and an umpire settles any difference.")
+    elif appr:
+        appraisal = "We did not find an appraisal clause in the policy you uploaded. Ask the insurer whether one applies."
+    else:
+        appraisal = ("If your policy has an appraisal clause, you and the insurer each pick an appraiser, and an umpire "
+                     "settles any difference. Upload your policy to check.")
 
     steps = [
         {"date": sent.isoformat(), "step": "Send the approved letter",
@@ -113,13 +131,13 @@ def if_no(data: dict) -> dict:
          "detail": f"Within 35 days of the offer, tell the insurer in writing if you cannot buy a comparable car for "
                    f"the settlement, so it has to reopen the claim ({RULE}(c))."},
         {"date": None, "step": "Ask for an appraisal",
-         "detail": "If your policy has an appraisal clause, you and the insurer each pick an appraiser, and an umpire "
-                   "settles any difference. Look for \"Appraisal\" in your policy. It is not in your documents yet."},
+         "detail": appraisal},
         {"date": None, "step": "File a complaint with the Department of Insurance",
          "detail": "It is free. The Department asks the insurer to respond. A draft is below."},
         {"date": None, "step": "Small claims court",
          "detail": (f"The {_usd(gap)} gap is within the {_usd(SMALL_CLAIMS_LIMIT)} limit for individuals, "
-                    "and you do not need a lawyer there.") if small_ok else
+                    "and you do not need a lawyer there. A person can file at most two claims over $2,500 a year "
+                    "(Code Civ. Proc. § 116.231).") if small_ok else
                    (f"The {_usd(gap)} gap is over the {_usd(SMALL_CLAIMS_LIMIT)} limit. Small claims can award only "
                     "up to the limit.")},
     ]
@@ -131,6 +149,7 @@ def if_no(data: dict) -> dict:
         "escalation": escalate(situation, gap),
         "questions": _questions(claim, audit, situation, gap),
         "state_bar_url": STATE_BAR_SEARCH_URL,
+        "referral_services_url": REFERRAL_SERVICES_URL,
     }
 
 
@@ -186,8 +205,15 @@ def case_package(data: dict, events: List[dict]) -> str:
             ("unknown" if r["status"] == "unknown" or status.get(r["check"]) == "unknown" else "pass")
     md += [f"- {n}. {name}, {RULE}{sec}: {status.get(n, 'not run')}" for n, name, sec in CHECKS]
 
+    docs = data.get("documents") or []
+    if docs:
+        md += ["", "## Policy and letters, cross-checked with the report", ""]
+        md += [f"- Uploaded: {d['name']} ({d['kind']}, {d['pages']} pages)" for d in docs]
+        for c in documents.crosscheck(claim, docs):
+            src = "; ".join(f"{f['name']} page {f['page']}: \"{f['quote']}\"" for f in c["sources"])
+            md.append(f"- {c['name']} ({c['status'].replace('_', ' ')}): {c['detail']}" + (f" (source: {src})" if src else ""))
     md += ["", "## Documented and missing", ""]
-    md += [f"- Missing: {m}" for m in _missing(claim, audit)]
+    md += [f"- Missing: {m}" for m in _missing(claim, audit, data)]
     esc = plan["escalation"]
     if esc["reasons"]:
         md += ["", "## Why the owner is talking to an attorney", ""]

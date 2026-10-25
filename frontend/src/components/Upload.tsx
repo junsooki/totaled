@@ -245,6 +245,43 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       </p>
 
       <section className="border-t border-line pt-6">
+        <h2 className={sectionH}>About the accident</h2>
+        <p className="mt-1 max-w-prose text-base text-muted">
+          Four quick questions. They decide whether we suggest talking to a lawyer. We never rate your case.
+        </p>
+        <div className="mt-4">
+          <StoryIntake
+            id={draft.id}
+            onAnswers={(answers: StoryAnswer[]) => {
+              setSituation((prev) => ({ ...prev, ...Object.fromEntries(answers.map((a) => [a.key, a.answer])) }));
+              setHeard(Object.fromEntries(answers.map((a) => [a.key, a.quote])));
+            }}
+            onUseNote={(note) => setDraft((d) => d && { ...d, claim: { ...d.claim, loss_note: note.slice(0, 600) } })}
+          />
+        </div>
+        <div className="mt-4 divide-y divide-line">
+          {SITUATION.map(([k, q]) => (
+            <fieldset key={k} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <legend className="sr-only">{q}</legend>
+              <span aria-hidden="true" className="text-lg text-ink">
+                {q}
+                {heard[k] && <span className="block text-sm text-muted">From your account: “{heard[k]}”</span>}
+              </span>
+              <div className="flex gap-2">
+                {([["Yes", true], ["No", false]] as const).map(([label, val]) => (
+                  <label key={label} className={`min-h-11 cursor-pointer border-2 px-4 py-2 text-lg font-semibold focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand ${situation[k] === val ? "border-brand bg-brand text-white" : "border-ink bg-surface text-ink hover:bg-brand-soft"}`}>
+                    <input type="radio" name={k} className="sr-only" checked={situation[k] === val}
+                      onChange={() => setSituation({ ...situation, [k]: val })} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-t border-line pt-6">
         <h2 className={sectionH}>Your car</h2>
         <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
           {VEHICLE.map(([k, label]) => (
@@ -334,7 +371,11 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
       </section>
 
       <section className="border-t border-line pt-6">
-        <h2 className={sectionH}>Cars the insurer compared</h2>
+        <details>
+          <summary className="cursor-pointer">
+            <h2 className={`${sectionH} inline`}>Cars the insurer compared ({c.comparables.length})</h2>
+            <span className="ml-3 text-base text-muted">The audit checks each one. Open to correct what we read.</span>
+          </summary>
         <ol className="mt-4 divide-y divide-line">
           {c.comparables.map((comp: Json, i: number) => (
             <li key={comp.id ?? i} className="py-6 first:pt-0 last:pb-0">
@@ -350,43 +391,7 @@ export default function Upload({ onConfirmed }: { onConfirmed: (id: string, clai
             </li>
           ))}
         </ol>
-      </section>
-
-      <section className="border-t border-line pt-6">
-        <h2 className={sectionH}>About the accident</h2>
-        <p className="mt-1 max-w-prose text-base text-muted">
-          Four quick questions. They decide whether we suggest talking to a lawyer. We never rate your case.
-        </p>
-        <div className="mt-4">
-          <StoryIntake
-            id={draft.id}
-            onAnswers={(answers: StoryAnswer[]) => {
-              setSituation((prev) => ({ ...prev, ...Object.fromEntries(answers.map((a) => [a.key, a.answer])) }));
-              setHeard(Object.fromEntries(answers.map((a) => [a.key, a.quote])));
-            }}
-            onUseNote={(note) => setDraft((d) => d && { ...d, claim: { ...d.claim, loss_note: note.slice(0, 600) } })}
-          />
-        </div>
-        <div className="mt-4 divide-y divide-line">
-          {SITUATION.map(([k, q]) => (
-            <fieldset key={k} className="flex flex-wrap items-center justify-between gap-3 py-3">
-              <legend className="sr-only">{q}</legend>
-              <span aria-hidden="true" className="text-lg text-ink">
-                {q}
-                {heard[k] && <span className="block text-sm text-muted">From your account: “{heard[k]}”</span>}
-              </span>
-              <div className="flex gap-2">
-                {([["Yes", true], ["No", false]] as const).map(([label, val]) => (
-                  <label key={label} className={`min-h-11 cursor-pointer border-2 px-4 py-2 text-lg font-semibold focus-within:outline-4 focus-within:outline-offset-2 focus-within:outline-brand ${situation[k] === val ? "border-brand bg-brand text-white" : "border-ink bg-surface text-ink hover:bg-brand-soft"}`}>
-                    <input type="radio" name={k} className="sr-only" checked={situation[k] === val}
-                      onChange={() => setSituation({ ...situation, [k]: val })} />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
-        </div>
+        </details>
       </section>
 
       {error && <p role="alert" className="text-base font-medium text-alert">{error}</p>}

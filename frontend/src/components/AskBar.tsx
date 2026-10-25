@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Json, post } from "@/lib/api";
 import { Button, inputCls } from "./ui";
+
+type Recognition = {
+  lang: string; interimResults: boolean; start: () => void; stop: () => void;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null;
+};
+type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+const label = (c: string) => (c.startsWith("guide:") ? "guide" : c);
 
 const EXAMPLES = ["When is my deadline?", "Why does comparable C2 fail?", "How was the market value worked out?"];
 
@@ -15,6 +23,35 @@ export default function AskBar({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);  // example questions show only while the bar is in use
+  const [listening, setListening] = useState(false);
+  const rec = useRef<Recognition | null>(null);
+
+  function listen() {
+    const w = window as SpeechWindow;
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) {
+      setError("Voice input is not available in this browser. Type your question instead.");
+      return;
+    }
+    const r = new SR();
+    r.lang = "en-US";
+    r.interimResults = false;
+    r.onresult = (e) => {
+      const t = e.results[0]?.[0]?.transcript?.trim();
+      if (t) { setQ(t); void ask(t); }
+    };
+    r.onerror = (e) => setError(`Microphone error: ${e.error}. You can type instead.`);
+    r.onend = () => setListening(false);
+    rec.current = r;
+    setListening(true);
+    r.start();
+  }
+
+  function readAloud() {
+    if (!answer?.found || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(answer.sentences.map((s: Json) => s.text).join(" ")));
+  }
 
   async function ask(question: string) {
     if (question.trim().length < 3 || busy) return;
@@ -55,7 +92,7 @@ export default function AskBar({ id }: { id: string }) {
                       {s.citations.map((c: string) => (
                         <button key={c} type="button" onClick={() => setOpen(open === `${i}:${c}` ? null : `${i}:${c}`)} aria-expanded={open === `${i}:${c}`}
                           className="mr-1 cursor-pointer border border-brand px-1 text-sm font-bold text-brand hover:bg-surface focus-visible:outline-4 focus-visible:outline-brand">
-                          {c}
+                          {label(c)}
                         </button>
                       ))}
                     </p>
@@ -64,7 +101,12 @@ export default function AskBar({ id }: { id: string }) {
                     ))}
                   </div>
                 ))}
-                <p className="text-sm text-muted">From your case file only · {answer.by === "claude" ? "Claude" : answer.by} · not legal advice</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={readAloud} className="cursor-pointer text-sm font-semibold text-brand underline focus-visible:outline-4 focus-visible:outline-brand">Read aloud</button>
+                  <p className="text-sm text-muted">
+                    From your case file{answer.guidance_searched ? " and Totaled's guidance (found by Moss)" : ""} only · {answer.by === "claude" ? "Claude" : answer.by} · not legal advice
+                  </p>
+                </div>
               </div>
             ) : (
               <p className="mt-1 text-base text-ink">That is not in your documents. Try asking about the checks, the listings, the deadline or your payout.</p>
@@ -85,6 +127,9 @@ export default function AskBar({ id }: { id: string }) {
           <label htmlFor="ask" className="sr-only">Ask about your case</label>
           <input id="ask" className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} maxLength={500}
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder="Ask about your case" />
+          <Button variant="secondary" onClick={() => (listening ? rec.current?.stop() : listen())} disabled={busy}>
+            {listening ? "Stop" : "Speak"}
+          </Button>
           <Button type="submit" disabled={busy || q.trim().length < 3}>Ask</Button>
         </form>
       </div>
