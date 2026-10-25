@@ -16,7 +16,8 @@ def _norm(s: str) -> str:
 
 
 def read(text: str) -> dict:
-    saved = demo_cache.story(text)  # a saved real Claude read of this exact account works without a key too
+    # Demo: any account gets the saved real Claude read, so its letter note (and the letter drafted from it) is precached
+    saved = demo_cache.story(text) or demo_cache.any_story()
     if saved:
         return dict(saved, by="claude (saved demo run)")
     if not ai.available():

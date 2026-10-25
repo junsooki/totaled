@@ -58,6 +58,11 @@ def story(text: str) -> Optional[dict]:
     return _get(_load().get("stories", {}), story_hash(text))
 
 
+def any_story() -> Optional[dict]:
+    stories = _load().get("stories", {})
+    return copy.deepcopy(next(iter(stories.values()))) if stories else None
+
+
 def document(pdf: bytes) -> Optional[dict]:
     return _get(_load().get("documents", {}), pdf_hash(pdf))
 
