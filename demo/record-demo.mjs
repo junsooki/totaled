@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const BASE = process.env.URL ?? "https://totaled-web.vercel.app";
+const BASE = process.env.URL ?? "https://toto-claims.vercel.app";
 const OUT = fileURLToPath(new URL("./out/", import.meta.url));  // .pathname breaks on Windows
 const SIZE = { width: 1280, height: 800 };
 const ACCOUNT = [
