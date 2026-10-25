@@ -120,7 +120,7 @@ export default function StoryIntake({ id, onAnswers, onUseNote }: {
 
       {read && (
         <div className="mt-4 space-y-3 border-t border-line pt-3">
-          {read.by !== "claude" ? (
+          {!String(read.by).startsWith("claude") ? (  // "claude" or "claude (saved demo run)"
             <p className="text-base text-ink">Saved for your attorney package. Claude is not configured here, so answer the questions below yourself.</p>
           ) : (
             <>
