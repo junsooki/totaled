@@ -64,7 +64,12 @@ def crosscheck(claim: Claim, docs: List[dict]) -> List[dict]:
     out = []
 
     def add(name, status, detail, *fields):
-        out.append({"name": name, "status": status, "detail": detail, "sources": [f for f in fields if f]})
+        seen, sources = set(), []
+        for f in fields:  # two facts can quote the same line; show each line once
+            if f and (f["doc"], f["page"], f["quote"]) not in seen:
+                seen.add((f["doc"], f["page"], f["quote"]))
+                sources.append(f)
+        out.append({"name": name, "status": status, "detail": detail, "sources": sources})
 
     if "policy" not in has:
         add("Policy", "needs_document", "Upload your policy to check the deductible, the appraisal clause and rental coverage.")
@@ -89,7 +94,8 @@ def crosscheck(claim: Claim, docs: List[dict]) -> List[dict]:
                 + (f", up to {_usd(_num(cap['value']) or 0)} per loss." if cap else "."), daily, cap)
         gap = _field(docs, "policy", "gap_coverage")
         if gap:
-            add("GAP coverage", "found", "Your policy " + ("includes" if gap["value"].lower().startswith("y") else "does not include")
+            has_gap = gap["value"].lower().startswith("y")
+            add("GAP coverage", "found" if has_gap else "not_found", "Your policy " + ("includes" if has_gap else "does not include")
                 + " loan/lease GAP coverage.", gap)
 
     if "letter" not in has:

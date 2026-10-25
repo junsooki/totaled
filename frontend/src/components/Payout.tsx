@@ -122,7 +122,7 @@ export default function Payout({ id, personas, onDone }: { id: string; personas:
                 </tbody>
               </table>
             </div>
-            <p className="text-sm text-muted">CRS credit report · {result.credit.source === "demo" ? "demo data" : "live data"}. Financing is an illustration, not a lender offer.</p>
+            <p className="text-sm text-muted">CRS credit report · {result.credit.source === "demo" ? "demo data" : result.credit.source === "cached" ? "saved data" : "live data"}. Financing is an illustration, not a lender offer.</p>
           </div>
 
           {np.negative_equity && (

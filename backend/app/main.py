@@ -722,10 +722,10 @@ def grant_mandate(cid: str, body: MandateRequest):
         "sellers": sellers,
         "granted_at": granted.isoformat(),
         "expires_at": (granted + timedelta(hours=MANDATE_HOURS)).isoformat(),
-        "can": [f"Place one refundable hold deposit of up to ${body.spending_cap:,.2f}",
+        "can": [f"Place one refundable hold deposit on a car priced up to ${body.spending_cap:,.2f}",
                 "Pay only a seller listed here, after the seller check passed",
                 f"Hold only a car priced inside your ${rep['budget']:,.0f} budget"],
-        "cannot": ["Charge more than the spending cap",
+        "cannot": ["Hold a car priced over the spending cap",
                    "Pay a seller that failed or skipped the check",
                    "Buy the car, sign a contract or take out a loan",
                    "Charge your card without your approval on the next screen",
@@ -773,6 +773,9 @@ def checkout(cid: str, body: Checkout):
         raise HTTPException(400, "This seller is not in your mandate. Update the mandate to add it")
     if car["price"] > m["budget"]:
         raise HTTPException(400, f"The car's ${car['price']:,.0f} price is over your ${m['budget']:,.0f} budget")
+    if car["price"] > m["spending_cap"]:
+        raise HTTPException(400, f"Blocked by your spending cap: the car's ${car['price']:,.0f} price is over your "
+                                 f"${m['spending_cap']:,.2f} cap. Raise the cap in the mandate to hold this car")
     card = "".join(c for c in body.card_number if c.isdigit())
     if card not in VISA_TEST_CARDS or not _luhn(card):
         raise HTTPException(400, "Test mode accepts Visa test card numbers only, such as 4242 4242 4242 4242")
@@ -798,9 +801,9 @@ def checkout(cid: str, body: Checkout):
             ],
             "total": round(body.deposit + held, 2),
             "spending_cap": m["spending_cap"],
-            "remaining_under_cap": round(m["spending_cap"] - body.deposit - held, 2),
+            "remaining_under_cap": round(m["spending_cap"] - car["price"], 2),
             "within_mandate": [
-                f"Deposit ${body.deposit:,.2f} is within the ${m['spending_cap']:,.2f} spending cap",
+                f"Car price ${car['price']:,.0f} and deposit ${body.deposit:,.2f} are within the ${m['spending_cap']:,.2f} spending cap",
                 f"{car.get('seller_name') or 'The seller'} passed the CRS seller check ({chk['source']})",
                 f"Car price ${car['price']:,.0f} is inside the ${m['budget']:,.0f} budget",
                 f"Placed before the mandate expires ({m['expires_at'][:16].replace('T', ' ')})",

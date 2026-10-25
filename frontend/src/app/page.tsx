@@ -49,8 +49,20 @@ export default function Home() {
     Array.from(document.querySelectorAll<HTMLElement>("main h1")).find((h) => h.offsetParent !== null)?.focus();
   }, [cur]);
 
+  // Retry until the server answers, so a late-starting backend does not leave the page without its test profiles.
   useEffect(() => {
-    call("/api/status").then(setStatus).catch((e) => setStatusError(e.message));
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = (tries: number) =>
+      call("/api/status")
+        .then((s) => { if (live) { setStatus(s); setStatusError(null); } })
+        .catch((e) => {
+          if (!live) return;
+          setStatusError(e.message);
+          if (tries < 30) timer = setTimeout(() => load(tries + 1), 2000);
+        });
+    load(0);
+    return () => { live = false; clearTimeout(timer); };
   }, []);
 
   async function step(label: string, fn: () => Promise<void>) {
@@ -126,7 +138,7 @@ export default function Home() {
           : []),
         ...(audit ? [{ label: "Letter", value: approved ? "Approved" : letter ? "Drafted, needs your approval" : "Not drafted yet" }] : []),
         ...(results?.purchase ? [{ label: "Car deposit hold", value: usd(results.purchase.total) }] : []),
-        ...(results?.purchase ? [{ label: "Spending cap left", value: usd(results.purchase.remaining_under_cap) }] : []),
+        ...(results?.purchase ? [{ label: "Car price under your cap by", value: usd(results.purchase.remaining_under_cap) }] : []),
       ]
     : [];
 

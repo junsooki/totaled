@@ -23,7 +23,7 @@ const carName = (c: Json) => `${c.year} ${c.make} ${c.model} ${c.trim ?? ""}`.tr
 const parseNum = (s: string) => (s.trim() === "" ? NaN : Number(s));
 const when = (iso: string) => new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
 const CANNOT = [
-  "Charge more than the spending cap",
+  "Hold a car priced over the spending cap",
   "Pay a seller that failed or skipped the check",
   "Buy the car, sign a contract or take out a loan",
   "Charge your card without your approval on the next screen",
@@ -50,7 +50,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [checks, setChecks] = useState<Record<string, Json>>({});
-  const [cap, setCap] = useState("1000");
+  const [cap, setCap] = useState<string | null>(null);  // until typed, the cap is the whole budget
   const [mandate, setMandate] = useState<Json | null>(null);
   const [hold, setHold] = useState<Json | null>(null);
   const [deposit, setDeposit] = useState("500");
@@ -72,7 +72,8 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
   }, [id, attempt]);
 
   const depositNum = parseNum(deposit);
-  const capNum = parseNum(cap);
+  const capText = cap ?? (data ? String(Math.floor(data.budget)) : "");
+  const capNum = parseNum(capText);
   const depositOk = Number.isFinite(depositNum) && depositNum > 0;
   const capOk = Number.isFinite(capNum) && capNum > 0;
   const consent = consentKey === `${hold?.vin}|${deposit}|${card}`;
@@ -223,8 +224,8 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
               ]}
             />
             <div>
-              <label htmlFor="car-cap" className="block text-base font-medium text-ink">Spending cap ($)</label>
-              <input id="car-cap" className={`${inputCls} mt-1`} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} aria-invalid={!capOk} />
+              <label htmlFor="car-cap" className="block text-base font-medium text-ink">Spending cap on the car&apos;s price ($)</label>
+              <input id="car-cap" className={`${inputCls} mt-1`} inputMode="decimal" value={capText} onChange={(e) => setCap(e.target.value)} aria-invalid={!capOk} />
             </div>
           </div>
           <div>
@@ -316,7 +317,7 @@ export default function Replace({ id, personas, onPurchased }: { id: string; per
                   ),
                 })),
                 { label: "Total held", value: usd(receipt.total, true), big: true },
-                { label: "Left under your cap", value: `${usd(receipt.remaining_under_cap, true)} of ${usd(receipt.spending_cap, true)}`, tone: "good" as const },
+                { label: "Car price under your cap by", value: `${usd(receipt.remaining_under_cap, true)} (cap ${usd(receipt.spending_cap, true)})`, tone: "good" as const },
               ]}
             />
           </div>
