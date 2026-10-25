@@ -5,7 +5,7 @@ owner's exact words; code drops anything whose quote is not in the account.
 """
 import re
 
-from . import ai
+from . import ai, demo_cache
 from .escalate import QUESTIONS
 
 MAX_CHARS = 4000
@@ -16,6 +16,9 @@ def _norm(s: str) -> str:
 
 
 def read(text: str) -> dict:
+    saved = demo_cache.story(text)  # a saved real Claude read of this exact account works without a key too
+    if saved:
+        return dict(saved, by="claude (saved demo run)")
     if not ai.available():
         return {"timeline": [], "answers": [], "letter_note": None, "dropped": 0,
                 "by": "not read (Claude not configured)"}

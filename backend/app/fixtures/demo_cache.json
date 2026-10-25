@@ -12080,5 +12080,41 @@
     }
    ]
   }
+ },
+ "stories": {
+  "1e05315a32562db35e49ac7267437a3fddbe03862a84727e1e38b1f4b7eee4a1": {
+   "timeline": [
+    {
+     "when": "October 3rd",
+     "event": "Owner was stopped at a red light on Shattuck Avenue and was hit from behind by an Uber.",
+     "quote": "On October 3rd I was stopped at a red light on Shattuck Avenue when an Uber hit me from behind."
+    },
+    {
+     "when": null,
+     "event": "The other driver's insurer disputes fault, saying the owner braked suddenly.",
+     "quote": "The other driver's insurer says I braked suddenly, so they dispute fault."
+    }
+   ],
+   "answers": [
+    {
+     "key": "injured",
+     "answer": false,
+     "quote": "Nobody was hurt."
+    },
+    {
+     "key": "fault_disputed",
+     "answer": true,
+     "quote": "The other driver's insurer says I braked suddenly, so they dispute fault."
+    },
+    {
+     "key": "rideshare_or_commercial",
+     "answer": true,
+     "quote": "an Uber hit me from behind"
+    }
+   ],
+   "letter_note": "On October 3rd, my car was struck from behind while stopped at a red light on Shattuck Avenue.",
+   "dropped": 0,
+   "by": "claude"
+  }
  }
 }

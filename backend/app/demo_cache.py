@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -36,6 +37,14 @@ def pdf_hash(pdf: bytes) -> str:
 def _get(section: dict, key: str) -> Optional[dict]:
     hit = section.get(key)
     return copy.deepcopy(hit) if hit else None  # callers may edit what they get
+
+
+def story_hash(text: str) -> str:
+    return hashlib.sha256(re.sub(r"[^a-z0-9]+", " ", text.lower()).strip().encode()).hexdigest()
+
+
+def story(text: str) -> Optional[dict]:
+    return _get(_load().get("stories", {}), story_hash(text))
 
 
 def document(pdf: bytes) -> Optional[dict]:
