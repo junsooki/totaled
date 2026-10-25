@@ -289,7 +289,7 @@ async def add_document(cid: str, kind: str = Form(...), file: Optional[UploadFil
 def list_documents(cid: str):
     data = _claim(cid)
     docs = data.get("documents") or []
-    return {"documents": [_public_doc(d) for d in docs], "checks": documents.crosscheck(Claim(**data["claim"]), docs)}
+    return {"documents": [_public_doc(d) for d in docs], "checks": documents.crosscheck(Claim(**data["claim"]), docs, documents.report_pdf(data))}
 
 
 @app.get("/api/claims/{cid}/documents/{doc_id}/page/{page}.png")

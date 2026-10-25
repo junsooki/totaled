@@ -3,6 +3,7 @@
 Every field must quote a line that code finds on the cited page; anything else is dropped. The cross-checks are
 plain code comparisons; they never judge the case.
 """
+import base64
 import json
 import re
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import List, Optional
 
 import fitz
 
-from . import ai, demo_cache
+from . import ai, demo_cache, report_lines
 from .schemas import Claim
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -60,9 +61,21 @@ def _usd(x: float) -> str:
     return f"${x:,.2f}"
 
 
-def crosscheck(claim: Claim, docs: List[dict]) -> List[dict]:
-    """Each check: name, status (match | mismatch | found | not_found | needs_document), detail, sources."""
+def report_pdf(data: dict) -> Optional[bytes]:
+    return base64.b64decode(data["pdf"]) if data.get("pdf") else None
+
+
+def crosscheck(claim: Claim, docs: List[dict], pdf: Optional[bytes] = None) -> List[dict]:
+    """Each check: name, status (match | mismatch | found | not_found | needs_document), detail, sources.
+
+    With the report's PDF, a check that compares the report with a document also lists the report's own printed line,
+    so both sides of the comparison can be shown."""
     o = claim.offer
+
+    def rep(*needles):
+        hit = report_lines.line_with(pdf, *needles) if pdf else None
+        return dict(hit, doc="report", name="Insurer's valuation report") if hit else None
+
     has = {d["kind"] for d in docs}
     out = []
 
@@ -81,10 +94,12 @@ def crosscheck(claim: Claim, docs: List[dict]) -> List[dict]:
         if ded and _num(ded["value"]) is not None:
             p = _num(ded["value"])
             if abs(p - o.deductible) < 0.5:
-                add("Deductible", "match", f"The offer subtracts {_usd(o.deductible)}, the same as your policy's collision deductible.", ded)
+                add("Deductible", "match", f"The offer subtracts {_usd(o.deductible)}, the same as your policy's collision deductible.",
+                    rep("less deductible", f"{o.deductible:,.2f}"), ded)
             else:
                 add("Deductible", "mismatch", f"The offer subtracts {_usd(o.deductible)}, but your policy's collision deductible "
-                    f"is {_usd(p)}. Ask the insurer to explain the difference of {_usd(abs(o.deductible - p))}.", ded)
+                    f"is {_usd(p)}. Ask the insurer to explain the difference of {_usd(abs(o.deductible - p))}.",
+                    rep("less deductible", f"{o.deductible:,.2f}"), ded)
         else:
             add("Deductible", "not_found", "We could not find a collision deductible in the policy you uploaded.")
         appr = _field(docs, "policy", "appraisal_clause")
@@ -109,16 +124,19 @@ def crosscheck(claim: Claim, docs: List[dict]) -> List[dict]:
             a = _num(amt["value"])
             add("Offer amount", "match" if abs(a - o.total) < 1 else "mismatch",
                 f"The letter's offer of {_usd(a)} " + ("matches the valuation report." if abs(a - o.total) < 1
-                                                       else f"differs from the report's {_usd(o.total)}."), amt)
+                                                       else f"differs from the report's {_usd(o.total)}."),
+                rep("total settlement offer", f"{o.total:,.2f}"), amt)
         num = _field(docs, "letter", "claim_number")
         if num and claim.claim_number:
             same = re.sub(r"\W", "", num["value"]).lower() == re.sub(r"\W", "", claim.claim_number).lower()
             add("Claim number", "match" if same else "mismatch",
-                f"The letter's claim number {num['value']} " + ("matches the report." if same else f"differs from the report's {claim.claim_number}."), num)
+                f"The letter's claim number {num['value']} " + ("matches the report." if same else f"differs from the report's {claim.claim_number}."),
+                rep(claim.claim_number), num)
         dt = _field(docs, "letter", "letter_date")
         if dt:
             same = dt["value"] == o.offer_date
             add("Letter date", "match" if same else "mismatch",
                 f"The letter is dated {dt['value']}" + (", the same as the offer in the report." if same else
-                f"; the report's offer is dated {o.offer_date}. The 35-day window runs from when you received the final offer."), dt)
+                f"; the report's offer is dated {o.offer_date}. The 35-day window runs from when you received the final offer."),
+                rep("valuation date", o.offer_date), dt)
     return out

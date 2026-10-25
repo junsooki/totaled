@@ -20,7 +20,7 @@ def sources(data: dict) -> List[dict]:
     out.append({"id": "deadline", "fact": f"Deadline to tell the insurer you cannot buy a comparable car for the "
                                           f"settlement: {audit['deadline']['date']} (35 days after the offer, {RULE}(c))",
                 "amounts": []})
-    for c in documents.crosscheck(claim, data.get("documents") or []):
+    for c in documents.crosscheck(claim, data.get("documents") or [], documents.report_pdf(data)):
         if c["status"] == "needs_document":
             continue
         quotes = "; ".join(f"{f['name']} page {f['page']}: \"{f['quote']}\"" for f in c["sources"])

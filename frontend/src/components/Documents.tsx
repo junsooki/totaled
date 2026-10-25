@@ -11,7 +11,7 @@ const LABEL: Record<string, string> = {
   match: "Matches", found: "Found", mismatch: "Doesn't match", not_found: "Not found", needs_document: "Needs a document",
 };
 
-function PageLine({ path }: { path: string }) {
+function PageLine({ path, alt }: { path: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -21,7 +21,7 @@ function PageLine({ path }: { path: string }) {
   }, [path]);
   if (failed) return <p className="text-base text-alert">We could not load that page.</p>;
   // eslint-disable-next-line @next/next/no-img-element
-  return url ? <img src={url} alt="Document page with the line highlighted" className="mt-2 w-full border border-line" /> : <p className="text-base text-muted">Loading the page…</p>;
+  return url ? <img src={url} alt={alt} className="mt-2 w-full border border-line" /> : <p className="text-base text-muted">Loading the page…</p>;
 }
 
 /** The owner's policy and the insurer's letters, read field by field and checked against the valuation report. */
@@ -90,19 +90,24 @@ export default function Documents({ id }: { id: string }) {
               <Badge tone={TONE[c.status] ?? "zinc"}>{LABEL[c.status] ?? c.status}</Badge>
             </div>
             <p className="mt-1 max-w-prose text-base text-ink">{c.detail}</p>
-            {c.sources.map((f: Json, i: number) => {
-              const key = `${c.name}:${i}`;
-              return (
-                <div key={key}>
-                  <p className="mt-1 text-sm text-muted">{f.name}, page {f.page}: “{f.quote}”</p>
-                  <button type="button" onClick={() => setShown(shown === key ? null : key)}
-                    className="cursor-pointer text-base font-semibold text-brand underline underline-offset-2">
-                    {shown === key ? "Hide the line" : "Show the line"}
-                  </button>
-                  {shown === key && <PageLine path={`/api/claims/${id}/documents/${f.doc}/page/${f.page}.png?quote=${encodeURIComponent(f.quote)}`} />}
-                </div>
-              );
-            })}
+            {c.sources.length > 0 && (
+              <div>
+                {c.sources.map((f: Json, i: number) => (
+                  <p key={i} className="mt-1 text-sm text-muted">{f.name}, page {f.page}: “{f.quote}”</p>
+                ))}
+                <button type="button" onClick={() => setShown(shown === c.name ? null : c.name)}
+                  className="cursor-pointer text-base font-semibold text-brand underline underline-offset-2">
+                  {shown === c.name ? "Hide the " : "Show the "}{c.sources.length > 1 ? "lines" : "line"}
+                </button>
+                {shown === c.name && c.sources.map((f: Json, i: number) => (
+                  <PageLine key={i}
+                    alt={f.doc === "report" ? `Insurer's valuation report page ${f.page}, with the line highlighted` : "Document page with the line highlighted"}
+                    path={f.doc === "report"
+                      ? `/api/claims/${id}/page/${f.page}.png?quote=${encodeURIComponent(f.quote)}`
+                      : `/api/claims/${id}/documents/${f.doc}/page/${f.page}.png?quote=${encodeURIComponent(f.quote)}`} />
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ul>

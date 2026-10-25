@@ -209,7 +209,7 @@ def case_package(data: dict, events: List[dict]) -> str:
     if docs:
         md += ["", "## Policy and letters, cross-checked with the report", ""]
         md += [f"- Uploaded: {d['name']} ({d['kind']}, {d['pages']} pages)" for d in docs]
-        for c in documents.crosscheck(claim, docs):
+        for c in documents.crosscheck(claim, docs, documents.report_pdf(data)):
             src = "; ".join(f"{f['name']} page {f['page']}: \"{f['quote']}\"" for f in c["sources"])
             md.append(f"- {c['name']} ({c['status'].replace('_', ' ')}): {c['detail']}" + (f" (source: {src})" if src else ""))
     md += ["", "## Documented and missing", ""]
