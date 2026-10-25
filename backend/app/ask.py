@@ -2,7 +2,7 @@
 import re
 from typing import List
 
-from . import ai, documents
+from . import ai, demo_cache, documents
 from .checks import CHECKS
 from .letter import build_evidence
 from .schemas import Claim
@@ -42,7 +42,11 @@ def _words(text: str) -> set:
 
 def answer(question: str, data: dict, guidance: List[dict] = ()) -> dict:
     """`guidance` is Moss's matching public guidance; each item becomes a citable source next to the case facts."""
-    src = sources(data) + [{"id": f"guide:{g['id']}", "fact": g["text"], "amounts": []} for g in guidance]
+    case_src = sources(data)
+    saved = demo_cache.ask(question, case_src)  # a saved real Claude answer to this exact question works without a key too
+    if saved:
+        return dict(saved, by="claude (saved demo run)")
+    src = case_src + [{"id": f"guide:{g['id']}", "fact": g["text"], "amounts": []} for g in guidance]
     facts = {s["id"]: s["fact"] for s in src}
     if ai.available():
         a = ai.answer_question(question, src)

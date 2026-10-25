@@ -12116,5 +12116,67 @@
    "dropped": 0,
    "by": "claude"
   }
+ },
+ "asks": {
+  "b5886a46953562c62bd387ee5a27e13561a5ed91dea0c4a578405e792de72fc7": {
+   "found": true,
+   "sentences": [
+    {
+     "text": "Golden State Mutual's offer of $17,104.75 (claim CLM-2026-48213) fails several checks, including comparables that don't match your EX trim or mileage, a $1,150 condition deduction without documentation, a base value of $17,050.00 when the adjusted comparables average $17,266.67, and missing prorated registration.",
+     "citations": [
+      "claim",
+      "check:5:C1",
+      "check:4:C2",
+      "check:3:C3",
+      "check:7",
+      "check:8",
+      "check:9"
+     ],
+     "ok": true,
+     "problems": []
+    },
+    {
+     "text": "Current listings put your car's market value at $20,510.00, which supports a counteroffer total of $22,187.28, $5,082.53 above the current offer.",
+     "citations": [
+      "market",
+      "counter"
+     ],
+     "ok": true,
+     "problems": []
+    },
+    {
+     "text": "The offer also subtracts a $500.00 deductible while your policy shows $250.00, and your policy has an appraisal clause either side can use if you disagree on the amount.",
+     "citations": [
+      "doc:deductible",
+      "doc:appraisal-clause"
+     ],
+     "ok": true,
+     "problems": []
+    },
+    {
+     "text": "The deadline to tell the insurer you cannot buy a comparable car for the settlement is 2026-11-18.",
+     "citations": [
+      "deadline"
+     ],
+     "ok": true,
+     "problems": []
+    }
+   ],
+   "sources": {
+    "market": "Market value at 48,200 mi from 12 current comparable listings: $20,510.00 (linear fit of price on mileage)",
+    "counter": "Counteroffer total $22,187.28: vehicle $20,510.00, sales tax $2,102.28, fees $75.00, less deductible $500.00; $5,082.53 above the current offer",
+    "check:5:C1": "Fails check 5 (Similar trim, options and mileage, 10 CCR \u00a7 2695.8(b)(2)) for comparable C1: trim LX vs EX; 61,400 mi vs 48,200 mi; missing Sunroof, Apple CarPlay, Heated Seats",
+    "check:8": "Fails check 8 (Base value is the average of the comparables, 10 CCR \u00a7 2695.8(b)(4)(A)): C2 mileage adjustment -400 has the wrong sign (52,000 vs 48,200 mi); average of adjusted values is $17,266.67, report says $17,050.00",
+    "check:3:C3": "Fails check 3 (Available locally (100 mi) within 90 days, 10 CCR \u00a7 2695.8(b)(2), (b)(4)(A)) for comparable C3: 214 mi away; listed 137 days before the offer",
+    "check:9": "Fails check 9 (Offer includes tax, fees and prorated registration, minus deductible, 10 CCR \u00a7 2695.8(b)(1)): Missing: prorated registration",
+    "deadline": "Deadline to tell the insurer you cannot buy a comparable car for the settlement: 2026-11-18 (35 days after the offer, 10 CCR \u00a7 2695.8(c))",
+    "check:4:C2": "Fails check 4 (Identified by VIN, stock number or plate, with seller contact, 10 CCR \u00a7 2695.8(b)(2)) for comparable C2: no VIN, stock number or plate; no seller contact",
+    "check:7": "Fails check 7 (Condition deduction only if documented below average, 10 CCR \u00a7 2695.8(b)(2)): $1,150 deducted with grade \"Average\" and without documentation",
+    "doc:appraisal-clause": "Appraisal clause (found): Your policy has an appraisal clause: if you and the insurer disagree on the amount, either side can demand an appraisal. Source: Sample policy page 2: \"If we and you do not agree on the amount of loss, either may demand an appraisal of the loss.\"",
+    "doc:deductible": "Deductible (mismatch): The offer subtracts $500.00, but your policy's collision deductible is $250.00. Ask the insurer to explain the difference of $250.00. Source: Insurer's valuation report page 1: \"Less Deductible: -$500.00\"; Sample policy page 1: \"Collision Coverage Deductible: $250\"",
+    "claim": "2019 Honda Civic EX VIN 2HGFC1F35KH654321, 48,200 mi; insurer's offer dated 2026-10-14 totals $17,104.75 with base value $17,050.00; insurer Golden State Mutual Insurance Co., claim number CLM-2026-48213, policy number CA-AUTO-7731904, policyholder name Jordan Rivera"
+   },
+   "by": "claude"
+  }
  }
 }

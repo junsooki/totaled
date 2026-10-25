@@ -39,6 +39,17 @@ def _get(section: dict, key: str) -> Optional[dict]:
     return copy.deepcopy(hit) if hit else None  # callers may edit what they get
 
 
+def ask_hash(question: str, sources: list) -> str:
+    q = re.sub(r"[^a-z0-9]+", " ", question.lower()).strip()
+    facts = json.dumps([[s["id"], s["fact"]] for s in sources], separators=(",", ":"))
+    return hashlib.sha256(f"{q}|{facts}".encode()).hexdigest()
+
+
+def ask(question: str, sources: list) -> Optional[dict]:
+    """A saved answer to this exact question on exactly this case file (the case-file sources, not Moss guidance)."""
+    return _get(_load().get("asks", {}), ask_hash(question, sources))
+
+
 def story_hash(text: str) -> str:
     return hashlib.sha256(re.sub(r"[^a-z0-9]+", " ", text.lower()).strip().encode()).hexdigest()
 

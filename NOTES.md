@@ -50,6 +50,7 @@ It also saves `demo/out/totaled-demo.webm`. For OBS, run it headed and record th
 - **Letters or documents:** `cd backend && python scripts/build_demo_cache.py --keep-existing --claims ID1 ID2` (finished local claims, one without the note and one with it). Needs `ANTHROPIC_API_KEY`.
 - **Call audio and briefing audio:** `CARTESIA_OWNER_VOICE_ID=<your cloned voice id> python scripts/build_call_audio.py --claim ID --yes`. Without `--yes` it only prints the character count. **Rebuild the briefing on the day you present**, because its text has dates counted from the day the letter is approved. A missed saved file falls back to a live Cartesia call.
 - **Spoken account:** `python scripts/build_story_cache.py "the account text"`. One live Claude call.
+- **Ask-bar answer ("Where does my case stand?"):** `python scripts/build_ask_cache.py --claim ID "Where does my case stand?"`, using a local claim that went through the whole demo (sample policy loaded, payout calculated). One live Claude call. The saved answer only applies to that exact question on a case file with the same facts, so loading the sample letter too, or skipping the payout, falls back to a live answer.
 
 ## Open items and risks
 
