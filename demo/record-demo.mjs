@@ -157,7 +157,7 @@ try {
   await btn("Check seller").nth(2).click();
   await page.getByText(/^Deposit locked:/).waitFor();
   await show(page.getByText(/^Deposit locked:/));
-  await caption("CRS seller check: a lien is on record, so the deposit stays locked.", 4000);
+  await caption("We found a lien on this car through CRS, so the deposit stays locked.", 4000);
   await btn("Check seller").first().click();
   await page.getByText(/^Passed: identity verified/).first().waitFor();
   await show(btn("Grant this mandate"));
@@ -188,8 +188,18 @@ try {
   await show(page.getByText(/Stayed inside mandate/));
   await caption("$500 test-card hold placed, and the receipt shows it stayed inside the mandate.", 4500);
 
-  // 2:50 Close
-  await caption("Verify before you trust: every number, every seller, every source. Not legal advice. You approve every step.", 5000);
+  // Summary, then the ask bar
+  await btn("Continue to summary").click();
+  await page.getByText("Dollars at stake").waitFor();
+  await caption("The summary: what is at stake, what failed, and what is held.", 3500);
+  await page.getByLabel("Ask about your case").pressSequentially("Where does my case stand?", { delay: 70 });
+  await caption("And you can ask Toto about the case. Every sentence in the answer cites its source.", 2500);
+  await btn("Ask", true).click();
+  await page.getByText(/From your case file/).waitFor();
+  await page.waitForTimeout(4500);
+
+  // Close
+  await caption("Code computes every dollar, and you approve every step. Test mode only, and not legal advice.", 5000);
 } finally {
   const video = page.video();
   await context.close();
