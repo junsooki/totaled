@@ -7,9 +7,10 @@
 // A browser can't speak into its own mic, so a stand-in speech recognizer "says" the accident account; the caption says so.
 import { chromium } from "playwright";
 import { mkdirSync, readdirSync, renameSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const BASE = process.env.URL ?? "https://totaled-web.vercel.app";
-const OUT = new URL("./out/", import.meta.url).pathname;
+const OUT = fileURLToPath(new URL("./out/", import.meta.url));  // .pathname breaks on Windows
 const SIZE = { width: 1280, height: 800 };
 const ACCOUNT = [
   "On October 3rd I was stopped at a red light on Shattuck Avenue when an Uber hit me from behind.",
@@ -119,9 +120,20 @@ try {
   await btn("Approve this letter").waitFor();
   await caption("The counteroffer letter: every sentence cites evidence, and code rejects any dollar amount not in it.", 4500);
   await btn("Approve this letter").click();
-  await page.getByText("If they say no").waitFor();
-  await show(page.getByText("If they say no"));
+  await page.getByText("What the call could sound like").waitFor();
+  await show(page.getByText("What the call could sound like"), 1000);
+  await caption("A simulated call to the adjuster. The owner's voice is a clone of the presenter's; the adjuster is an AI voice. Every number comes from the case file.", 5500);
+  await btn("Hear the call").first().click();
+  await page.waitForTimeout(13000);
+  await btn("Stop the call").first().click();
+  await page.getByText("If they say no").first().waitFor();
+  await show(page.getByText("If they say no").first());
   await caption("If they say no: dated next steps, a complaint draft, and the policy's own appraisal clause.", 4500);
+  await show(page.getByText("If they say no, a follow-up call"), 1000);
+  await caption("And a follow-up call: the adjuster stands by the offer, and the owner asks for an appraisal and files a complaint.", 5000);
+  await btn("Hear the call").nth(1).click();
+  await page.waitForTimeout(9000);
+  await btn("Stop the call").first().click();
   await show(page.getByText("A lawyer is worth talking to, and here is why"));
   await caption("Fault is disputed and a rideshare was involved, so it explains why a lawyer is worth talking to. It never rates the case.", 5000);
   await btn("Show the script").click();
