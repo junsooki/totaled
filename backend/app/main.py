@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, ask, call_audio, call_routes, cartesia, comps, crs, db, demo_cache, documents, live, moss_voice, playbook, story  # noqa: E402
+from . import ai, ask, call_audio, call_routes, cartesia, comps, crs, db, demo_cache, documents, live, moss_voice, playbook, story, report_lines  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -393,6 +393,8 @@ def audit(cid: str):
     v = claim.vehicle
     _agent(cid, "Appraiser", "working", "Checking the report against the 10 rules in 10 CCR § 2695.8")
     checks = run_checks(claim)
+    if data.get("pdf"):  # point each check at the printed line that proves it, not the offer's one source line
+        report_lines.point_at_lines(checks, claim, base64.b64decode(data["pdf"]))
     failed = _failed_checks(checks)
     _agent(cid, "Appraiser", "working", f"{failed} of 10 checks failed")
     _agent(cid, "Appraiser", "working", f"Searching listings: {v.year} {v.make} {v.model} within "
