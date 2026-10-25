@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { call, download, Json } from "@/lib/api";
+import Briefing from "./Briefing";
 import { Button, Notice } from "./ui";
 
 const linkCls = "font-semibold text-brand underline underline-offset-4 hover:text-brand-dark";
@@ -73,6 +74,7 @@ export default function IfNo({ id }: { id: string }) {
           <p className="mt-3 text-sm text-muted">
             The package lists what is documented, with sources, and what is missing. It does not rate your case. Not a referral service.
           </p>
+          <Briefing id={id} />
         </Notice>
       )}
       {!esc.recommended && (

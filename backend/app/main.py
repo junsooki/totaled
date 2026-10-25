@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from . import ai, ask, comps, crs, db, demo_cache, live, moss_voice, playbook, story  # noqa: E402
+from . import ai, ask, cartesia, comps, crs, db, demo_cache, live, moss_voice, playbook, story  # noqa: E402
 from . import vin as vin_  # noqa: E402
 from .checks import CHECKS, LOCAL_RADIUS_MI, reopen_exception, run_checks  # noqa: E402
 from .letter import build_evidence, template_letter  # noqa: E402
@@ -78,6 +78,7 @@ def status():
         "claude": "live" if ai.available() else "missing",
         "crs": "demo" if crs.demo_mode() else ("live" if crs.available() else "missing"),
         "moss": "ready" if moss_voice.available() else "missing",
+        "cartesia": "live" if cartesia.available() else "missing",
         "voice_assistant": bool(moss_voice.available() and ai.available()),
         "database": "postgres" if db.DATABASE_URL else "sqlite",
         "checks": [{"check": n, "name": name, "rule": sec} for n, name, sec in CHECKS],
@@ -464,6 +465,27 @@ def case_package(cid: str):
     md = playbook.case_package(_require_approved(cid), db.events(cid))
     return Response(md, media_type="text/markdown",
                     headers={"Content-Disposition": f'attachment; filename="totaled-case-{cid}.md"'})
+
+
+@app.get("/api/claims/{cid}/briefing")
+def briefing_script(cid: str):
+    """The spoken briefing's script, for the owner to read before any audio is made."""
+    return {"script": playbook.briefing(_require_approved(cid)), "voice": cartesia.available()}
+
+
+@app.get("/api/claims/{cid}/briefing.mp3")
+def briefing_audio(cid: str):
+    """The same script read aloud by Cartesia in a stock, labeled AI voice."""
+    data = _require_approved(cid)
+    if not cartesia.available():
+        raise HTTPException(503, "Spoken briefings need CARTESIA_API_KEY")
+    try:
+        audio = cartesia.speak(playbook.briefing(data))
+    except Exception as e:
+        raise HTTPException(502, f"Could not make the audio: {e}")
+    db.log(cid, "briefing_audio", {})
+    return Response(audio, media_type="audio/mpeg",
+                    headers={"Content-Disposition": 'attachment; filename="totaled-case-briefing.mp3"'})
 
 
 # --- 4. Net payout -----------------------------------------------------------
